@@ -1,0 +1,453 @@
+/* ===== LOGIN MODERNO CON CARRUSEL ===== */
+
+/* Body del login moderno */
+.login-body-moderno {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Contenedor principal */
+.login-moderno-container {
+    display: flex;
+    min-height: 100vh;
+    background: white;
+    box-shadow: var(--shadow-xl);
+}
+
+/* ===== LADO IZQUIERDO - CARRUSEL ===== */
+.login-carrusel {
+    flex: 1;
+    position: relative;
+    background-color: #1a1a1a;
+    overflow: hidden;
+}
+
+.carrusel-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.9) 0%, rgba(118, 75, 162, 0.9) 100%);
+    z-index: 1;
+    mix-blend-mode: multiply;
+}
+
+.loginSwiper {
+    width: 100%;
+    height: 100%;
+}
+
+.swiper-slide {
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.slide-content {
+    text-align: center;
+    color: white;
+    z-index: 2;
+    padding: 2rem;
+    max-width: 500px;
+    animation: fadeInUp 0.5s ease-out;
+}
+
+.slide-content i {
+    font-size: 4rem;
+    margin-bottom: 1.5rem;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.slide-content h3 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.slide-content p {
+    font-size: 1.1rem;
+    opacity: 0.95;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Paginación del carrusel */
+.swiper-pagination-bullet {
+    width: 12px;
+    height: 12px;
+    background: white;
+    opacity: 0.5;
+}
+
+.swiper-pagination-bullet-active {
+    opacity: 1;
+    background: white;
+}
+
+/* Crédito del programador */
+.carrusel-credito {
+    position: absolute;
+    bottom: 2rem;
+    left: 2rem;
+    z-index: 3;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 500;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 0.5rem 1rem;
+    border-radius: 50px;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.carrusel-credito p {
+    margin: 0;
+    opacity: 0.9;
+}
+
+/* ===== LADO DERECHO - FORMULARIO ===== */
+.login-moderno-form {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 3rem;
+    background: white;
+    overflow-y: auto;
+}
+
+.login-moderno-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.login-moderno-logo {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    box-shadow: var(--shadow-md);
+}
+
+.login-moderno-logo i {
+    font-size: 2.5rem;
+    color: white;
+}
+
+.login-moderno-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--gray-800);
+    margin: 0 0 0.5rem 0;
+}
+
+.login-moderno-header p {
+    font-size: 1rem;
+    color: var(--gray-500);
+    margin: 0;
+}
+
+/* Formulario */
+.login-moderno-form-element {
+    max-width: 400px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* Grupos de formulario */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+}
+
+.form-label i {
+    color: var(--primary);
+    margin-right: 0.25rem;
+}
+
+/* Input wrapper */
+.input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    font-size: 0.95rem;
+    transition: all 0.2s;
+    background-color: white;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-alpha);
+}
+
+/* Toggle password */
+.password-toggle {
+    position: absolute;
+    right: 1rem;
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    cursor: pointer;
+    padding: 0;
+    font-size: 1rem;
+    transition: color 0.2s;
+}
+
+.password-toggle:hover {
+    color: var(--primary);
+}
+
+/* Opciones del formulario */
+.form-options {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+
+/* Checkbox personalizado */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--gray-600);
+}
+
+.checkbox-input {
+    display: none;
+}
+
+.checkbox-custom {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    position: relative;
+    transition: all 0.2s;
+}
+
+.checkbox-input:checked + .checkbox-custom {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    border-color: var(--primary);
+}
+
+.checkbox-input:checked + .checkbox-custom::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 0.7rem;
+}
+
+/* Link de olvidé contraseña */
+.forgot-link {
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: color 0.2s;
+}
+
+.forgot-link:hover {
+    color: var(--primary-dark);
+    text-decoration: underline;
+}
+
+/* Botón de login moderno */
+.login-moderno-button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    border: none;
+    border-radius: var(--radius-md);
+    color: white;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 1.5rem;
+}
+
+.login-moderno-button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.login-moderno-button i {
+    font-size: 1rem;
+}
+
+/* Footer del login */
+.login-moderno-footer {
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--gray-500);
+}
+
+.login-moderno-footer a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.login-moderno-footer a:hover {
+    text-decoration: underline;
+}
+
+/* Versión */
+.login-moderno-version {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--gray-400);
+    margin-top: 2rem;
+}
+
+/* Alertas */
+.alerta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 1.5rem;
+    animation: slideIn 0.3s ease-out;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.alerta.error {
+    background: linear-gradient(135deg, var(--danger-light) 0%, #fee2e2 100%);
+    border-left: 4px solid var(--danger);
+}
+
+.alerta.success {
+    background: linear-gradient(135deg, var(--success-light) 0%, #a7f3d0 100%);
+    border-left: 4px solid var(--success);
+}
+
+.alerta i {
+    font-size: 1.1rem;
+}
+
+.alerta.error i {
+    color: var(--danger);
+}
+
+.alerta.success i {
+    color: var(--success);
+}
+
+.alerta p {
+    color: var(--gray-700);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+/* Animaciones */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 968px) {
+    .login-moderno-container {
+        flex-direction: column;
+    }
+    
+    .login-carrusel {
+        height: 300px;
+    }
+    
+    .login-moderno-form {
+        padding: 2rem;
+    }
+    
+    .slide-content i {
+        font-size: 3rem;
+    }
+    
+    .slide-content h3 {
+        font-size: 1.5rem;
+    }
+    
+    .slide-content p {
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .login-moderno-form {
+        padding: 1.5rem;
+    }
+    
+    .login-moderno-logo {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .login-moderno-logo i {
+        font-size: 2rem;
+    }
+    
+    .login-moderno-header h1 {
+        font-size: 1.5rem;
+    }
+    
+    .form-options {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+}

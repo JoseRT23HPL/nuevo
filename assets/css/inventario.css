@@ -1,0 +1,375 @@
+/* ===== INVENTARIO ===== */
+
+/* Grid de inventario */
+.inventario-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+/* Cards de inventario */
+.card-inventario {
+    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    transition: all 0.2s;
+}
+
+.card-inventario:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+.card-header {
+    padding: 1rem 1.25rem;
+    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-title i {
+    color: var(--primary);
+}
+
+.card-link {
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 0.75rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background-color: var(--primary-alpha);
+    border-radius: var(--radius-md);
+    transition: all 0.2s;
+}
+
+.card-link:hover {
+    background-color: var(--primary);
+    color: white;
+}
+
+.card-body {
+    padding: 1.25rem;
+}
+
+/* Tablas de inventario */
+.tabla-responsive {
+    overflow-x: auto;
+}
+
+.tabla-inventario {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.tabla-inventario th {
+    text-align: left;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.tabla-inventario td {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--gray-100);
+    font-size: 0.85rem;
+    color: var(--gray-700);
+}
+
+.tabla-inventario tr:last-child td {
+    border-bottom: none;
+}
+
+/* Información de producto */
+.producto-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.producto-nombre {
+    font-weight: 500;
+    color: var(--gray-800);
+}
+
+.producto-codigo {
+    font-size: 0.7rem;
+    color: var(--gray-500);
+    font-family: monospace;
+}
+
+/* Cantidades de stock */
+.stock-cantidad {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.stock-cantidad.cero {
+    color: var(--danger);
+}
+
+.stock-cantidad.bajo {
+    color: var(--warning);
+}
+
+/* Badges de estado */
+.badge-estado {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-lg);
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.badge-estado.danger {
+    background: linear-gradient(135deg, var(--danger-light) 0%, #fee2e2 100%);
+    color: var(--danger);
+}
+
+.badge-estado.warning {
+    background: linear-gradient(135deg, var(--warning-light) 0%, #fef3c7 100%);
+    color: #b45309;
+}
+
+/* Botones de acción */
+.btn-accion-inventario {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: var(--radius-md);
+    color: var(--gray-400);
+    transition: all 0.2s;
+    text-decoration: none;
+}
+
+.btn-accion-inventario:hover {
+    background-color: var(--primary-alpha);
+    color: var(--primary);
+    transform: scale(1.1);
+}
+
+/* Fechas de movimiento */
+.fecha-movimiento {
+    display: flex;
+    flex-direction: column;
+}
+
+.fecha-dia {
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.fecha-hora {
+    font-size: 0.65rem;
+    color: var(--gray-500);
+}
+
+/* Badges de tipo */
+.badge-tipo {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-lg);
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.badge-tipo.entrada {
+    background: linear-gradient(135deg, var(--success-light) 0%, #a7f3d0 100%);
+    color: var(--success);
+}
+
+.badge-tipo.salida {
+    background: linear-gradient(135deg, var(--danger-light) 0%, #fee2e2 100%);
+    color: var(--danger);
+}
+
+.badge-tipo.ajuste {
+    background: linear-gradient(135deg, var(--warning-light) 0%, #fef3c7 100%);
+    color: #b45309;
+}
+
+/* Cantidades en movimientos */
+.cantidad {
+    font-weight: 600;
+}
+
+.cantidad.entrada {
+    color: var(--success);
+}
+
+.cantidad.salida {
+    color: var(--danger);
+}
+
+.cantidad.ajuste {
+    color: var(--warning);
+}
+
+/* Evolución de stock */
+.stock-evolucion {
+    font-size: 0.75rem;
+    color: var(--gray-600);
+    background-color: var(--gray-100);
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-md);
+}
+
+/* Acciones rápidas */
+.acciones-rapidas-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.accion-rapida-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    text-decoration: none;
+    transition: all 0.2s;
+    box-shadow: var(--shadow-sm);
+}
+
+.accion-rapida-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary);
+}
+
+.accion-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+}
+
+.accion-icon.blue {
+    background: linear-gradient(135deg, var(--info-light) 0%, #bfdbfe 100%);
+    color: var(--info);
+}
+
+.accion-icon.green {
+    background: linear-gradient(135deg, var(--success-light) 0%, #a7f3d0 100%);
+    color: var(--success);
+}
+
+.accion-icon.yellow {
+    background: linear-gradient(135deg, var(--warning-light) 0%, #fed7aa 100%);
+    color: var(--warning);
+}
+
+.accion-info h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin-bottom: 0.15rem;
+}
+
+.accion-info p {
+    font-size: 0.7rem;
+    color: var(--gray-500);
+}
+
+/* Estadísticas extendidas */
+.estadistica-sub {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--gray-500);
+    margin-top: 0.25rem;
+}
+
+.estadistica-link {
+    display: inline-block;
+    font-size: 0.7rem;
+    color: var(--primary);
+    text-decoration: none;
+    margin-top: 0.25rem;
+    font-weight: 500;
+}
+
+.estadistica-link i {
+    font-size: 0.6rem;
+    margin-left: 0.2rem;
+}
+
+.estadistica-link:hover {
+    text-decoration: underline;
+}
+
+/* Empty state pequeño */
+.empty-state-small {
+    text-align: center;
+    padding: 2rem;
+    color: var(--gray-500);
+}
+
+.empty-state-small i {
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-small p {
+    font-size: 0.875rem;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .inventario-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .estadisticas-grid[style*="repeat(4, 1fr)"] {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .estadisticas-grid[style*="repeat(4, 1fr)"] {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .acciones-rapidas-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .pv-header-right {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .pv-header-right .btn-header {
+        width: 100%;
+    }
+}
