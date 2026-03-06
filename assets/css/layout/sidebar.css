@@ -95,7 +95,7 @@
     white-space: nowrap;
 }
 
-/* ===== Menú del sidebar - MEJORADO CON EFECTOS COMO CARDS ===== */
+/* ===== Menú del sidebar ===== */
 .sidebar-menu {
     flex: 1;
     overflow-y: auto;
@@ -144,8 +144,7 @@
     overflow: hidden;
 }
 
-/* ===== ITEMS DEL MENÚ - CON EFECTO COMO CARDS ===== */
-/* ===== ITEMS DEL MENÚ - CON EFECTO COMO CARDS ===== */
+/* ===== ITEMS DEL MENÚ - SOLO LÍNEA INFERIOR (ELIMINADA LA SUPERIOR) ===== */
 .menu-item {
     display: flex;
     align-items: center;
@@ -162,7 +161,7 @@
     white-space: nowrap;
 }
 
-/* Efecto de card al hover - similar a las stats cards */
+/* Efecto de card al hover */
 .menu-item:hover {
     background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
     border-color: var(--gray-200);
@@ -171,14 +170,14 @@
     transform: translateX(4px);
 }
 
-/* Línea inferior - MÁS DELGADA Y EN LA PARTE DE ABAJO */
+/* SOLO LÍNEA INFERIOR - MÁS DELGADA */
 .menu-item::after {
     content: '';
     position: absolute;
     bottom: 0;
     left: 1rem;
     right: 1rem;
-    height: 2px; /* Más delgada */
+    height: 2px;
     background: linear-gradient(to right, var(--primary), var(--secondary));
     opacity: 0;
     transition: opacity 0.2s ease;
@@ -199,43 +198,13 @@
     right: 0.5rem;
 }
 
-/* Efecto de card al hover - similar a las stats cards */
-.menu-item:hover {
-    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
-    border-color: var(--gray-200);
-    box-shadow: var(--shadow-md);
-    color: var(--primary);
-    transform: translateX(4px);
-}
-
-/* Efecto de línea superior como las cards */
-.menu-item::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(to right, var(--primary), var(--secondary));
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.menu-item:hover::before {
-    opacity: 1;
-}
-
-/* Item activo */
+/* Item activo - fondo y color */
 .menu-item.active {
     background: linear-gradient(145deg, var(--primary-alpha) 0%, var(--secondary-alpha) 100%);
     border-color: var(--primary-light);
     box-shadow: var(--shadow-md);
     color: var(--primary);
     font-weight: 500;
-}
-
-.menu-item.active::before {
-    opacity: 1;
 }
 
 .menu-item i {

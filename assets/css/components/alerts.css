@@ -1,0 +1,98 @@
+/* ========================================
+   ALERTS.CSS - TODAS LAS ALERTAS DEL SISTEMA
+   ======================================== */
+
+/* Contenedor de alertas */
+.alerta-container {
+    position: relative;
+    min-height: 50px;
+    margin-bottom: 0.5rem;
+}
+
+.alerta-flotante {
+    position: sticky;
+    top: 80px;
+    z-index: 100;
+}
+
+/* Alerta base */
+.alerta {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 1.5rem;
+    animation: slideIn 0.3s ease-out;
+    box-shadow: var(--shadow-lg);
+    border-left: 4px solid transparent;
+}
+
+.alerta i {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.alerta p {
+    flex: 1;
+    color: var(--gray-700);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.alerta-content { flex: 1; }
+
+/* Alerta de éxito */
+.alerta.success {
+    background: linear-gradient(135deg, var(--success-light) 0%, #a7f3d0 100%);
+    border-left-color: var(--success);
+}
+
+.alerta.success i { color: var(--success); }
+.alerta.success p { color: var(--success-dark); }
+
+/* Alerta de error */
+.alerta.error {
+    background: linear-gradient(135deg, var(--danger-light) 0%, #fee2e2 100%);
+    border-left-color: var(--danger);
+}
+
+.alerta.error i { color: var(--danger); }
+.alerta.error p { color: var(--danger-dark); }
+
+/* Alerta de información */
+.alerta.info {
+    background: linear-gradient(135deg, var(--info-light) 0%, #bfdbfe 100%);
+    border-left-color: var(--info);
+}
+
+.alerta.info i { color: var(--info); }
+.alerta.info p { color: var(--info-dark); }
+
+/* Alerta de advertencia */
+.alerta.warning {
+    background: linear-gradient(135deg, var(--warning-light) 0%, #fef3c7 100%);
+    border-left-color: var(--warning);
+}
+
+.alerta.warning i { color: var(--warning); }
+.alerta.warning p { color: var(--warning-dark); }
+
+/* Acciones dentro de alertas */
+.alerta-acciones {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    flex-wrap: wrap;
+}
+
+/* Animaciones */
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-20px); display: none; }
+}

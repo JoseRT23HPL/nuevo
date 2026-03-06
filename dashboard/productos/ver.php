@@ -1,92 +1,106 @@
 <?php
+require_once '../../config.php';
+requiereAuth();
+
+$conn = getDB();
+$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+
+if ($id <= 0) {
+    header('Location: index.php');
+    exit;
+}
+
+// Obtener producto con sus relaciones
+$stmt = $conn->prepare("
+    SELECT p.*, 
+           c.nombre as categoria_nombre,
+           c.descripcion as categoria_descripcion,
+           m.nombre as marca_nombre
+    FROM productos p
+    LEFT JOIN categorias c ON p.id_categoria = c.id
+    LEFT JOIN marcas m ON p.id_marca = m.id
+    WHERE p.id = ?
+");
+$stmt->bind_param("i", $id);
+$stmt->execute();
+$result = $stmt->get_result();
+$producto = $result->fetch_assoc();
+
+if (!$producto) {
+    header('Location: index.php');
+    exit;
+}
+
+// Obtener movimientos de inventario
+$movimientos = [];
+$stmt = $conn->prepare("
+    SELECT m.*, u.username 
+    FROM movimientos_inventario m
+    LEFT JOIN usuarios u ON m.id_usuario = u.id
+    WHERE m.id_producto = ?
+    ORDER BY m.fecha_movimiento DESC
+    LIMIT 10
+");
+$stmt->bind_param("i", $id);
+$stmt->execute();
+$result = $stmt->get_result();
+while ($row = $result->fetch_assoc()) {
+    $movimientos[] = $row;
+}
+
+// Obtener ventas recientes de este producto
+$ventas = [];
+$stmt = $conn->prepare("
+    SELECT dv.*, v.folio, v.fecha_venta, u.username as vendedor
+    FROM detalle_ventas dv
+    JOIN ventas v ON dv.id_venta = v.id
+    JOIN usuarios u ON v.id_usuario = u.id
+    WHERE dv.id_producto = ?
+    ORDER BY v.fecha_venta DESC
+    LIMIT 10
+");
+$stmt->bind_param("i", $id);
+$stmt->execute();
+$result = $stmt->get_result();
+while ($row = $result->fetch_assoc()) {
+    $ventas[] = $row;
+}
+
+// Estadísticas
+$stats = [];
+$stmt = $conn->prepare("
+    SELECT 
+        COALESCE(SUM(cantidad), 0) as total_vendido,
+        COALESCE(SUM(subtotal), 0) as ingresos
+    FROM detalle_ventas 
+    WHERE id_producto = ?
+");
+$stmt->bind_param("i", $id);
+$stmt->execute();
+$stats = $stmt->get_result()->fetch_assoc();
+
+// Datos para gráfico (últimos 6 meses)
+$meses = [];
+$ventas_mensuales = [];
+for ($i = 5; $i >= 0; $i--) {
+    $mes = date('Y-m', strtotime("-$i months"));
+    $mes_nombre = date('M Y', strtotime("-$i months"));
+    $meses[] = $mes_nombre;
+    
+    $stmt = $conn->prepare("
+        SELECT COALESCE(SUM(dv.cantidad), 0) as total 
+        FROM detalle_ventas dv
+        JOIN ventas v ON dv.id_venta = v.id
+        WHERE dv.id_producto = ? 
+        AND DATE_FORMAT(v.fecha_venta, '%Y-%m') = ?
+    ");
+    $stmt->bind_param("is", $id, $mes);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $ventas_mensuales[] = $result->fetch_assoc()['total'];
+}
+
 include '../header.php';
-
-// Datos de ejemplo para el producto (CON IMAGEN)
-$producto = [
-    'id' => 1,
-    'sku' => 'TRP-001-24',
-    'codigo_barras' => '750123456789',
-    'nombre' => 'Martillo de Uña 16oz con Mango de Madera',
-    'descripcion' => 'Martillo de uña profesional con cabeza forjada en acero al carbono. Mango de madera de fresno con acabado ergonómico. Ideal para carpintería y construcción.',
-    'categoria_nombre' => 'Herramientas',
-    'categoria_descripcion' => 'Herramientas manuales para construcción y carpintería',
-    'marca_nombre' => 'Truper',
-    'precio_compra' => 98.50,
-    'precio_venta' => 185.00,
-    'stock_actual' => 45,
-    'stock_minimo' => 10,
-    'activo' => true,
-    'fecha_creacion' => '2024-01-15 10:30:00',
-    'imagen' => 'https://via.placeholder.com/300x300?text=Martillo'
-];
-
-// Datos de movimientos de ejemplo
-$movimientos = [
-    [
-        'fecha' => '2024-03-15 14:30:00',
-        'tipo' => 'entrada',
-        'cantidad' => 50,
-        'stock_anterior' => 195,
-        'stock_nuevo' => 245,
-        'motivo' => 'Compra a proveedor',
-        'usuario' => 'Admin User'
-    ],
-    [
-        'fecha' => '2024-03-14 11:20:00',
-        'tipo' => 'salida',
-        'cantidad' => 2,
-        'stock_anterior' => 197,
-        'stock_nuevo' => 195,
-        'motivo' => 'Venta #V-001234',
-        'usuario' => 'María G.'
-    ],
-    [
-        'fecha' => '2024-03-13 09:45:00',
-        'tipo' => 'ajuste',
-        'cantidad' => 5,
-        'stock_anterior' => 192,
-        'stock_nuevo' => 197,
-        'motivo' => 'Ajuste por inventario',
-        'usuario' => 'Carlos R.'
-    ]
-];
-
-// Datos de ventas de ejemplo
-$ventas = [
-    [
-        'fecha' => '2024-03-15',
-        'folio' => 'V-001234',
-        'id_venta' => 1234,
-        'cantidad' => 2,
-        'precio_unitario' => 185.00,
-        'subtotal' => 370.00,
-        'vendedor' => 'Admin User'
-    ],
-    [
-        'fecha' => '2024-03-14',
-        'folio' => 'V-001230',
-        'id_venta' => 1230,
-        'cantidad' => 1,
-        'precio_unitario' => 185.00,
-        'subtotal' => 185.00,
-        'vendedor' => 'Laura M.'
-    ],
-    [
-        'fecha' => '2024-03-12',
-        'folio' => 'V-001225',
-        'id_venta' => 1225,
-        'cantidad' => 3,
-        'precio_unitario' => 185.00,
-        'subtotal' => 555.00,
-        'vendedor' => 'Admin User'
-    ]
-];
-
-// Estadísticas de ejemplo
-$total_vendido = 45;
-$ingresos = 8325.00;
-$meses = ['Ene 24', 'Feb 24', 'Mar 24', 'Abr 24', 'May 24', 'Jun 24'];
-$ventas_mensuales = [12, 15, 8, 10, 14, 18];
 ?>
 
 <!-- Header de la página -->
@@ -99,31 +113,36 @@ $ventas_mensuales = [12, 15, 8, 10, 14, 18];
         <span class="pv-badge">CONSULTA</span>
     </div>
     
+    <!-- Header de la página - Línea aproximada 40 -->
     <div class="pv-header-right" style="gap: 0.75rem;">
-        <a href="/dashboard/productos/editar.php?id=<?php echo $producto['id']; ?>" class="btn-header primary" style="text-decoration: none;">
+        <a href="<?php echo url('dashboard/productos/editar.php?id=' . $producto['id']); ?>" class="btn-header primary" style="text-decoration: none;">
             <i class="fas fa-edit"></i>
             Editar
         </a>
-        <a href="/dashboard/productos/index.php" class="btn-header" style="text-decoration: none;">
+        <a href="<?php echo url('dashboard/productos/index.php'); ?>" class="btn-header" style="text-decoration: none;">
             <i class="fas fa-arrow-left"></i>
             Volver
         </a>
     </div>
 </div>
 
-<!-- ===== NUEVA SECCIÓN DE PERFIL ESTILO FACEBOOK ===== -->
+<!-- SECCIÓN DE PERFIL ESTILO FACEBOOK -->
 <div class="producto-perfil-container">
     <div class="producto-perfil-header">
         <div class="perfil-imagen-wrapper">
             <div class="perfil-imagen">
-                <img src="<?php echo $producto['imagen']; ?>" alt="<?php echo $producto['nombre']; ?>">
+                <?php if ($producto['imagen_url']): ?>
+                    <img src="<?php echo BASE_URL . '/' . $producto['imagen_url']; ?>" alt="<?php echo h($producto['nombre']); ?>">
+                <?php else: ?>
+                    <img src="<?php echo asset('images/no-image.png'); ?>" alt="Sin imagen">
+                <?php endif; ?>
             </div>
         </div>
         <div class="perfil-info">
-            <h1 class="perfil-nombre"><?php echo $producto['nombre']; ?></h1>
+            <h1 class="perfil-nombre"><?php echo h($producto['nombre']); ?></h1>
             <div class="perfil-codigos">
-                <span class="perfil-sku">SKU: <?php echo $producto['sku']; ?></span>
-                <span class="perfil-barras">Código: <?php echo $producto['codigo_barras']; ?></span>
+                <span class="perfil-sku">SKU: <?php echo h($producto['sku']); ?></span>
+                <span class="perfil-barras">Código: <?php echo $producto['codigo_barras'] ?: 'Sin código'; ?></span>
             </div>
             <div class="perfil-estado">
                 <span class="badge-estado <?php echo $producto['activo'] ? 'activo' : 'inactivo'; ?>">
@@ -138,11 +157,11 @@ $ventas_mensuales = [12, 15, 8, 10, 14, 18];
                 </span>
             </div>
             <div class="perfil-acciones-rapidas">
-                <a href="#" class="perfil-accion" onclick="ajustarStock(<?php echo $producto['id']; ?>)">
+                <a href="ajustar_stock.php?id=<?php echo $producto['id']; ?>" class="perfil-accion">
                     <i class="fas fa-cubes"></i>
                     <span>Ajustar Stock</span>
                 </a>
-                <a href="#" class="perfil-accion" onclick="venderProducto(<?php echo $producto['id']; ?>)">
+                <a href="/dashboard/ventas/index.php?agregar=<?php echo $producto['id']; ?>" class="perfil-accion">
                     <i class="fas fa-shopping-cart"></i>
                     <span>Vender</span>
                 </a>
@@ -168,31 +187,33 @@ $ventas_mensuales = [12, 15, 8, 10, 14, 18];
             <div class="card-content">
                 <div class="info-row">
                     <span class="info-label">Categoría:</span>
-                    <span class="info-value"><?php echo $producto['categoria_nombre']; ?></span>
+                    <span class="info-value"><?php echo $producto['categoria_nombre'] ?: 'Sin categoría'; ?></span>
                 </div>
-                <?php if ($producto['categoria_descripcion']): ?>
+                <?php if (!empty($producto['categoria_descripcion'])): ?>
                 <div class="info-row">
                     <span class="info-label"></span>
-                    <span class="info-desc"><?php echo $producto['categoria_descripcion']; ?></span>
+                    <span class="info-desc"><?php echo h($producto['categoria_descripcion']); ?></span>
                 </div>
                 <?php endif; ?>
                 <div class="info-row">
                     <span class="info-label">Marca:</span>
-                    <span class="info-value"><?php echo $producto['marca_nombre']; ?></span>
+                    <span class="info-value"><?php echo $producto['marca_nombre'] ?: 'Sin marca'; ?></span>
                 </div>
             </div>
         </div>
         
         <!-- Descripción -->
+        <?php if (!empty($producto['descripcion'])): ?>
         <div class="info-card">
             <h3 class="card-title">
                 <i class="fas fa-align-left"></i>
                 Descripción
             </h3>
             <div class="card-content">
-                <p class="descripcion-texto"><?php echo nl2br($producto['descripcion']); ?></p>
+                <p class="descripcion-texto"><?php echo nl2br(h($producto['descripcion'])); ?></p>
             </div>
         </div>
+        <?php endif; ?>
     </div>
     
     <!-- Columna derecha - Precios y stock -->
@@ -207,11 +228,11 @@ $ventas_mensuales = [12, 15, 8, 10, 14, 18];
                 <div class="precios-grid">
                     <div class="precio-item">
                         <span class="precio-label">Precio de Compra</span>
-                        <span class="precio-valor compra">$<?php echo number_format($producto['precio_compra'], 2); ?></span>
+                        <span class="precio-valor compra"><?php echo formatoPrecio($producto['precio_compra']); ?></span>
                     </div>
                     <div class="precio-item">
                         <span class="precio-label">Precio de Venta</span>
-                        <span class="precio-valor venta">$<?php echo number_format($producto['precio_venta'], 2); ?></span>
+                        <span class="precio-valor venta"><?php echo formatoPrecio($producto['precio_venta']); ?></span>
                     </div>
                     <?php 
                     $ganancia = $producto['precio_venta'] - $producto['precio_compra'];
@@ -220,7 +241,7 @@ $ventas_mensuales = [12, 15, 8, 10, 14, 18];
                     <div class="precio-item ganancia">
                         <span class="precio-label">Ganancia Estimada</span>
                         <span class="precio-valor <?php echo $ganancia >= 0 ? 'positiva' : 'negativa'; ?>">
-                            $<?php echo number_format($ganancia, 2); ?>
+                            <?php echo formatoPrecio($ganancia); ?>
                         </span>
                         <span class="porcentaje">(<?php echo number_format($porcentaje, 1); ?>%)</span>
                     </div>
@@ -302,7 +323,7 @@ $ventas_mensuales = [12, 15, 8, 10, 14, 18];
                             <?php foreach ($movimientos as $mov): ?>
                             <tr>
                                 <td class="fecha-mov">
-                                    <?php echo date('d/m/Y H:i', strtotime($mov['fecha'])); ?>
+                                    <?php echo date('d/m/Y H:i', strtotime($mov['fecha_movimiento'])); ?>
                                 </td>
                                 <td>
                                     <span class="tipo-badge <?php echo $mov['tipo']; ?>">
@@ -318,8 +339,8 @@ $ventas_mensuales = [12, 15, 8, 10, 14, 18];
                                 <td class="text-center stock-evolucion">
                                     <?php echo $mov['stock_anterior']; ?> → <?php echo $mov['stock_nuevo']; ?>
                                 </td>
-                                <td><?php echo $mov['motivo']; ?></td>
-                                <td><?php echo $mov['usuario']; ?></td>
+                                <td><?php echo h($mov['motivo']); ?></td>
+                                <td><?php echo $mov['username'] ?: 'Sistema'; ?></td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -359,16 +380,16 @@ $ventas_mensuales = [12, 15, 8, 10, 14, 18];
                         <tbody>
                             <?php foreach ($ventas as $venta): ?>
                             <tr>
-                                <td><?php echo date('d/m/Y', strtotime($venta['fecha'])); ?></td>
+                                <td><?php echo date('d/m/Y', strtotime($venta['fecha_venta'])); ?></td>
                                 <td>
                                     <a href="/dashboard/ventas/ver.php?id=<?php echo $venta['id_venta']; ?>" class="folio-link">
-                                        #<?php echo $venta['folio']; ?>
+                                        #<?php echo h($venta['folio']); ?>
                                     </a>
                                 </td>
                                 <td class="text-right cantidad-venta"><?php echo $venta['cantidad']; ?></td>
-                                <td class="text-right">$<?php echo number_format($venta['precio_unitario'], 2); ?></td>
-                                <td class="text-right subtotal">$<?php echo number_format($venta['subtotal'], 2); ?></td>
-                                <td><?php echo $venta['vendedor']; ?></td>
+                                <td class="text-right"><?php echo formatoPrecio($venta['precio_unitario']); ?></td>
+                                <td class="text-right subtotal"><?php echo formatoPrecio($venta['subtotal']); ?></td>
+                                <td><?php echo h($venta['vendedor']); ?></td>
                                 <td class="text-center">
                                     <a href="/dashboard/ventas/ver.php?id=<?php echo $venta['id_venta']; ?>" class="accion-icon" title="Ver venta">
                                         <i class="fas fa-eye"></i>
@@ -396,7 +417,7 @@ $ventas_mensuales = [12, 15, 8, 10, 14, 18];
                     </div>
                     <div class="estadistica-info">
                         <span class="estadistica-label">Ventas totales</span>
-                        <span class="estadistica-valor"><?php echo $total_vendido; ?></span>
+                        <span class="estadistica-valor"><?php echo $stats['total_vendido']; ?></span>
                         <span class="estadistica-unidad">unidades vendidas</span>
                     </div>
                 </div>
@@ -407,7 +428,7 @@ $ventas_mensuales = [12, 15, 8, 10, 14, 18];
                     </div>
                     <div class="estadistica-info">
                         <span class="estadistica-label">Ingresos generados</span>
-                        <span class="estadistica-valor">$<?php echo number_format($ingresos, 2); ?></span>
+                        <span class="estadistica-valor"><?php echo formatoPrecio($stats['ingresos']); ?></span>
                     </div>
                 </div>
                 
@@ -438,23 +459,19 @@ $ventas_mensuales = [12, 15, 8, 10, 14, 18];
 <script>
 // Función para cambiar de pestaña
 function showTab(tabName) {
-    // Ocultar todos los contenidos
     document.querySelectorAll('.tab-pane').forEach(tab => {
         tab.classList.remove('active');
         tab.classList.add('hidden');
     });
     
-    // Desactivar todos los botones
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
     });
     
-    // Mostrar el tab seleccionado
     const tabContent = document.getElementById('tab-' + tabName);
     tabContent.classList.remove('hidden');
     tabContent.classList.add('active');
     
-    // Activar el botón clickeado
     event.target.classList.add('active');
 }
 
@@ -469,10 +486,6 @@ function venderProducto(id) {
 
 function imprimirEtiqueta(id) {
     window.open('etiqueta.php?id=' + id, '_blank', 'width=400,height=300');
-}
-
-function verHistorial(id) {
-    window.location.href = 'movimientos.php?id=' + id;
 }
 
 // Gráfico de ventas

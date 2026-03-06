@@ -1,20 +1,94 @@
 <?php
+require_once '../../config.php';
+requiereAuth();
+
+$conn = getDB();
+
+// Obtener filtros actuales
+$fecha_inicio = $_GET['fecha_inicio'] ?? date('Y-m-01');
+$fecha_fin = $_GET['fecha_fin'] ?? date('Y-m-d');
+$buscar = $_GET['buscar'] ?? '';
+
+// Construir condiciones WHERE
+$condiciones = [];
+$params = [];
+$types = "";
+
+// Filtro por fecha
+if (!empty($fecha_inicio) && !empty($fecha_fin)) {
+    $condiciones[] = "DATE(v.fecha_venta) BETWEEN ? AND ?";
+    $params[] = $fecha_inicio;
+    $params[] = $fecha_fin;
+    $types .= "ss";
+}
+
+// Filtro por búsqueda (folio, nombre de usuario)
+if (!empty($buscar)) {
+    $condiciones[] = "(v.folio LIKE ? OR u.nombre LIKE ? OR u.username LIKE ?)";
+    $buscar_param = "%$buscar%";
+    $params[] = $buscar_param;
+    $params[] = $buscar_param;
+    $params[] = $buscar_param;
+    $types .= "sss";
+}
+
+$where = empty($condiciones) ? "1=1" : implode(" AND ", $condiciones);
+
+// ===== ESTADÍSTICAS =====
+$stats_sql = "
+    SELECT 
+        COUNT(*) as total_ventas,
+        COALESCE(SUM(total), 0) as total_ingresos,
+        COALESCE(AVG(total), 0) as ticket_promedio
+    FROM ventas v
+    WHERE $where
+";
+
+$stats_stmt = $conn->prepare($stats_sql);
+if (!empty($params)) {
+    $stats_stmt->bind_param($types, ...$params);
+}
+$stats_stmt->execute();
+$estadisticas = $stats_stmt->get_result()->fetch_assoc();
+
+// ===== VENTAS =====
+$sql = "
+    SELECT v.*, u.nombre as cajero_nombre, u.username,
+           (SELECT COUNT(*) FROM detalle_ventas WHERE id_venta = v.id) as total_productos
+    FROM ventas v
+    JOIN usuarios u ON v.id_usuario = u.id
+    WHERE $where
+    ORDER BY v.fecha_venta DESC
+";
+
+$stmt = $conn->prepare($sql);
+if (!empty($params)) {
+    $stmt->bind_param($types, ...$params);
+}
+$stmt->execute();
+$result = $stmt->get_result();
+
+$ventas = [];
+while ($row = $result->fetch_assoc()) {
+    $ventas[] = $row;
+}
+
 include '../header.php';
 ?>
 
-<!-- Header del Historial -->
+<!-- Header del Historial - CORREGIDO -->
 <div class="pv-header">
     <div class="pv-header-left">
         <div class="pv-logo">
-            <i class="fas fa-history" style="color: var(--primary);"></i>
+            <i class="fas fa-history"></i>
             <h1>Historial de Ventas</h1>
         </div>
         <span class="pv-badge">CONSULTA</span>
     </div>
     
     <div class="pv-header-right">
-        <a href="/dashboard/ventas/index.php" class="btn-header primary" style="text-decoration: none;">
-            <i class="fas fa-plus"></i>
+        <a href="<?php echo url('dashboard/ventas/index.php'); ?>" class="btn-nueva-venta">
+            <i class="fas fa-plus-circle"></i>
             Nueva Venta
         </a>
     </div>
@@ -30,7 +104,7 @@ include '../header.php';
                     <i class="fas fa-calendar"></i>
                     Fecha inicio
                 </label>
-                <input type="date" name="fecha_inicio" value="2024-03-01" class="filtro-input">
+                <input type="date" name="fecha_inicio" value="<?php echo $fecha_inicio; ?>" class="filtro-input">
             </div>
             
             <!-- Fecha fin -->
@@ -39,7 +113,7 @@ include '../header.php';
                     <i class="fas fa-calendar-check"></i>
                     Fecha fin
                 </label>
-                <input type="date" name="fecha_fin" value="2024-03-31" class="filtro-input">
+                <input type="date" name="fecha_fin" value="<?php echo $fecha_fin; ?>" class="filtro-input">
             </div>
             
             <!-- Buscar -->
@@ -48,7 +122,7 @@ include '../header.php';
                     <i class="fas fa-search"></i>
                     Buscar
                 </label>
-                <input type="text" name="buscar" placeholder="Folio o cajero..." class="filtro-input">
+                <input type="text" name="buscar" placeholder="Folio o cajero..." value="<?php echo h($buscar); ?>" class="filtro-input">
             </div>
             
             <!-- Botones -->
@@ -58,7 +132,7 @@ include '../header.php';
                     Filtrar
                 </button>
                 
-                <a href="/dashboard/ventas/historial.php" class="btn-filtro btn-secondary">
+                <a href="<?php echo url('dashboard/ventas/historial.php'); ?>" class="btn-filtro btn-secondary">
                     <i class="fas fa-times"></i>
                     Limpiar
                 </a>
@@ -76,7 +150,7 @@ include '../header.php';
         </div>
         <div class="estadistica-info">
             <span class="estadistica-label">Total de ventas</span>
-            <span class="estadistica-valor">156</span>
+            <span class="estadistica-valor"><?php echo $estadisticas['total_ventas']; ?></span>
         </div>
     </div>
     
@@ -87,7 +161,7 @@ include '../header.php';
         </div>
         <div class="estadistica-info">
             <span class="estadistica-label">Ingresos totales</span>
-            <span class="estadistica-valor">$45,678.90</span>
+            <span class="estadistica-valor">$<?php echo number_format($estadisticas['total_ingresos'], 2); ?></span>
         </div>
     </div>
     
@@ -98,7 +172,7 @@ include '../header.php';
         </div>
         <div class="estadistica-info">
             <span class="estadistica-label">Ticket promedio</span>
-            <span class="estadistica-valor">$292.81</span>
+            <span class="estadistica-valor">$<?php echo number_format($estadisticas['ticket_promedio'], 2); ?></span>
         </div>
     </div>
 </div>
@@ -118,208 +192,88 @@ include '../header.php';
             </tr>
         </thead>
         <tbody>
-            <!-- Venta 1 -->
-            <tr class="fila-venta">
-                <td class="col-folio">
-                    <span class="folio-numero">#V-001234</span>
-                </td>
-                <td class="col-fecha">
-                    <span class="fecha-dia">15/03/2024</span>
-                    <span class="fecha-hora">14:30</span>
-                </td>
-                <td class="col-cajero">
-                    <span class="cajero-nombre">Admin User</span>
-                </td>
-                <td class="text-center">
-                    <span class="badge-productos">5</span>
-                </td>
-                <td class="text-center">
-                    <span class="badge-metodo efectivo">Efectivo</span>
-                </td>
-                <td class="col-total">$1,250.00</td>
-                <td class="col-acciones">
-                    <div class="acciones-wrapper">
-                        <a href="#" class="accion-icon" title="Ver ticket" target="_blank">
-                            <i class="fas fa-receipt"></i>
+            <?php if (count($ventas) > 0): ?>
+                <?php foreach ($ventas as $v): ?>
+                <tr class="fila-venta">
+                    <td class="col-folio">
+                        <span class="folio-numero"><?php echo $v['folio']; ?></span>
+                    </td>
+                    <td class="col-fecha">
+                        <span class="fecha-dia"><?php echo date('d/m/Y', strtotime($v['fecha_venta'])); ?></span>
+                        <span class="fecha-hora"><?php echo date('H:i', strtotime($v['fecha_venta'])); ?></span>
+                    </td>
+                    <td class="col-cajero">
+                        <span class="cajero-nombre"><?php echo h($v['cajero_nombre'] ?: $v['username']); ?></span>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge-productos"><?php echo $v['total_productos']; ?></span>
+                    </td>
+                    <td class="text-center">
+                        <?php
+                        $metodo_class = '';
+                        $metodo_text = '';
+                        switch($v['metodo_pago']) {
+                            case 'efectivo':
+                                $metodo_class = 'efectivo';
+                                $metodo_text = 'Efectivo';
+                                break;
+                            case 'transferencia':
+                                $metodo_class = 'transferencia';
+                                $metodo_text = 'Transferencia';
+                                break;
+                            default:
+                                $metodo_class = 'efectivo';
+                                $metodo_text = ucfirst($v['metodo_pago']);
+                        }
+                        ?>
+                        <span class="badge-metodo <?php echo $metodo_class; ?>"><?php echo $metodo_text; ?></span>
+                    </td>
+                    <td class="col-total">$<?php echo number_format($v['total'], 2); ?></td>
+                    <td class="col-acciones">
+                        <div class="acciones-wrapper">
+                            <a href="<?php echo url('dashboard/ventas/ticket.php?id=' . $v['id']); ?>" class="accion-icon" title="Ver ticket" target="_blank">
+                                <i class="fas fa-receipt"></i>
+                            </a>
+                            <a href="<?php echo url('dashboard/ventas/detalle.php?id=' . $v['id']); ?>" class="accion-icon" title="Ver detalles">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <tr>
+                    <td colspan="7" class="empty-state-row">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <h3>No hay ventas en este período</h3>
+                        <p>Prueba con otros filtros o realiza una nueva venta</p>
+                        <a href="<?php echo url('dashboard/ventas/index.php'); ?>" class="btn-header primary" style="display: inline-block; margin-top: 1rem;">
+                            <i class="fas fa-plus"></i>
+                            Nueva Venta
                         </a>
-                        <a href="#" class="accion-icon" title="Ver detalles">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                    </div>
-                </td>
-            </tr>
-            
-            <!-- Venta 2 -->
-            <tr class="fila-venta">
-                <td class="col-folio">
-                    <span class="folio-numero">#V-001233</span>
-                </td>
-                <td class="col-fecha">
-                    <span class="fecha-dia">15/03/2024</span>
-                    <span class="fecha-hora">12:15</span>
-                </td>
-                <td class="col-cajero">
-                    <span class="cajero-nombre">María González</span>
-                </td>
-                <td class="text-center">
-                    <span class="badge-productos">3</span>
-                </td>
-                <td class="text-center">
-                    <span class="badge-metodo tarjeta">Tarjeta</span>
-                </td>
-                <td class="col-total">$890.50</td>
-                <td class="col-acciones">
-                    <div class="acciones-wrapper">
-                        <a href="#" class="accion-icon" title="Ver ticket">
-                            <i class="fas fa-receipt"></i>
-                        </a>
-                        <a href="#" class="accion-icon" title="Ver detalles">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                    </div>
-                </td>
-            </tr>
-            
-            <!-- Venta 3 -->
-            <tr class="fila-venta">
-                <td class="col-folio">
-                    <span class="folio-numero">#V-001232</span>
-                </td>
-                <td class="col-fecha">
-                    <span class="fecha-dia">15/03/2024</span>
-                    <span class="fecha-hora">10:45</span>
-                </td>
-                <td class="col-cajero">
-                    <span class="cajero-nombre">Carlos Rodríguez</span>
-                </td>
-                <td class="text-center">
-                    <span class="badge-productos">8</span>
-                </td>
-                <td class="text-center">
-                    <span class="badge-metodo transferencia">Transferencia</span>
-                </td>
-                <td class="col-total">$2,340.00</td>
-                <td class="col-acciones">
-                    <div class="acciones-wrapper">
-                        <a href="#" class="accion-icon" title="Ver ticket">
-                            <i class="fas fa-receipt"></i>
-                        </a>
-                        <a href="#" class="accion-icon" title="Ver detalles">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                    </div>
-                </td>
-            </tr>
-            
-            <!-- Venta 4 -->
-            <tr class="fila-venta">
-                <td class="col-folio">
-                    <span class="folio-numero">#V-001231</span>
-                </td>
-                <td class="col-fecha">
-                    <span class="fecha-dia">14/03/2024</span>
-                    <span class="fecha-hora">18:20</span>
-                </td>
-                <td class="col-cajero">
-                    <span class="cajero-nombre">Admin User</span>
-                </td>
-                <td class="text-center">
-                    <span class="badge-productos">2</span>
-                </td>
-                <td class="text-center">
-                    <span class="badge-metodo efectivo">Efectivo</span>
-                </td>
-                <td class="col-total">$560.00</td>
-                <td class="col-acciones">
-                    <div class="acciones-wrapper">
-                        <a href="#" class="accion-icon" title="Ver ticket">
-                            <i class="fas fa-receipt"></i>
-                        </a>
-                        <a href="#" class="accion-icon" title="Ver detalles">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                    </div>
-                </td>
-            </tr>
-            
-            <!-- Venta 5 -->
-            <tr class="fila-venta">
-                <td class="col-folio">
-                    <span class="folio-numero">#V-001230</span>
-                </td>
-                <td class="col-fecha">
-                    <span class="fecha-dia">14/03/2024</span>
-                    <span class="fecha-hora">16:00</span>
-                </td>
-                <td class="col-cajero">
-                    <span class="cajero-nombre">Laura Méndez</span>
-                </td>
-                <td class="text-center">
-                    <span class="badge-productos">7</span>
-                </td>
-                <td class="text-center">
-                    <span class="badge-metodo tarjeta">Tarjeta</span>
-                </td>
-                <td class="col-total">$1,890.00</td>
-                <td class="col-acciones">
-                    <div class="acciones-wrapper">
-                        <a href="#" class="accion-icon" title="Ver ticket">
-                            <i class="fas fa-receipt"></i>
-                        </a>
-                        <a href="#" class="accion-icon" title="Ver detalles">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                    </div>
-                </td>
-            </tr>
+                    </td>
+                </tr>
+            <?php endif; ?>
         </tbody>
     </table>
     
     <!-- Resumen de resultados -->
+    <?php if (count($ventas) > 0): ?>
     <div class="tabla-footer">
         <p class="resultados-info">
             <i class="fas fa-info-circle"></i>
-            Mostrando: <strong>5 ventas</strong> del período 01/03/2024 al 31/03/2024
+            Mostrando: <strong><?php echo count($ventas); ?> ventas</strong> 
+            <?php if ($fecha_inicio && $fecha_fin): ?>
+                del período <?php echo date('d/m/Y', strtotime($fecha_inicio)); ?> al <?php echo date('d/m/Y', strtotime($fecha_fin)); ?>
+            <?php endif; ?>
+            <?php if (!empty($buscar)): ?>
+                con búsqueda "<?php echo h($buscar); ?>"
+            <?php endif; ?>
         </p>
     </div>
+    <?php endif; ?>
 </div>
-
-<!-- Empty state (comentado por ahora) 
-<div class="empty-state">
-    <div class="empty-icon">
-        <i class="fas fa-shopping-cart"></i>
-    </div>
-    <h3>No hay ventas en este período</h3>
-    <p>Prueba con otros filtros o realiza una nueva venta</p>
-    <a href="/dashboard/ventas/index.php" class="btn-header primary">
-        <i class="fas fa-plus"></i>
-        Nueva Venta
-    </a>
-</div>
--->
-
-<style>
-/* Animación para las filas */
-@keyframes fadeInRow {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.fila-venta {
-    animation: fadeInRow 0.3s ease-out forwards;
-}
-
-.fila-venta:nth-child(1) { animation-delay: 0.05s; }
-.fila-venta:nth-child(2) { animation-delay: 0.1s; }
-.fila-venta:nth-child(3) { animation-delay: 0.15s; }
-.fila-venta:nth-child(4) { animation-delay: 0.2s; }
-.fila-venta:nth-child(5) { animation-delay: 0.25s; }
-</style>
 
 <?php include '../footer.php'; ?>

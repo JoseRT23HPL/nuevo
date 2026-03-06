@@ -1,0 +1,130 @@
+/* ========================================
+   BADGES.CSS - TODOS LOS BADGES DEL SISTEMA
+   ======================================== */
+
+/* Badge base */
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-lg);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Badges de estado (activo/inactivo) */
+.estado-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-lg);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.estado-badge.activo {
+    background: linear-gradient(135deg, var(--success-light) 0%, #a7f3d0 100%);
+    color: var(--success);
+}
+
+.estado-badge.inactivo {
+    background: linear-gradient(135deg, var(--danger-light) 0%, #fee2e2 100%);
+    color: var(--danger);
+}
+
+/* Badges de stock */
+.stock-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    padding: 0.3rem 0.8rem;
+    border-radius: var(--radius-lg);
+    font-size: 0.8rem;
+    font-weight: 500;
+    min-width: 70px;
+}
+
+.stock-badge.stock-ok {
+    background: linear-gradient(135deg, var(--success-light) 0%, #a7f3d0 100%);
+    color: var(--success);
+}
+
+.stock-badge.stock-bajo {
+    background: linear-gradient(135deg, var(--warning-light) 0%, #fef3c7 100%);
+    color: #b45309;
+}
+
+.stock-badge.stock-cero {
+    background: linear-gradient(135deg, var(--danger-light) 0%, #fee2e2 100%);
+    color: var(--danger);
+}
+
+/* Badges de tipo de movimiento */
+.tipo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: var(--radius-lg);
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.tipo-badge.entrada {
+    background: linear-gradient(135deg, var(--success-light) 0%, #a7f3d0 100%);
+    color: var(--success);
+}
+
+.tipo-badge.salida {
+    background: linear-gradient(135deg, var(--danger-light) 0%, #fee2e2 100%);
+    color: var(--danger);
+}
+
+.tipo-badge.ajuste {
+    background: linear-gradient(135deg, var(--warning-light) 0%, #fef3c7 100%);
+    color: #b45309;
+}
+
+/* Badges de método de pago */
+.badge-metodo {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-lg);
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.badge-metodo.efectivo {
+    background: linear-gradient(135deg, var(--success-light) 0%, #a7f3d0 100%);
+    color: var(--success);
+}
+
+.badge-metodo.transferencia {
+    background: linear-gradient(135deg, var(--secondary-alpha) 0%, #ddd6fe 100%);
+    color: var(--secondary);
+}
+
+/* Badge de productos (cantidad) */
+.badge-productos {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: linear-gradient(135deg, var(--primary-alpha), var(--secondary-alpha));
+    border-radius: var(--radius-lg);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--primary);
+    min-width: 2.5rem;
+    text-align: center;
+}
+
+/* Badge para SKU */
+.badge-sku {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    background-color: var(--gray-100);
+    border-radius: var(--radius-md);
+    font-size: 0.7rem;
+    color: var(--gray-600);
+    font-weight: 500;
+}

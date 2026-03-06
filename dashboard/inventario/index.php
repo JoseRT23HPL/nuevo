@@ -1,4 +1,70 @@
 <?php
+require_once '../../config.php';
+requiereAuth();
+
+$conn = getDB();
+
+// ===== ESTADÍSTICAS DE INVENTARIO =====
+
+// Total de productos activos
+$total_productos = 0;
+$result = $conn->query("SELECT COUNT(*) as total FROM productos WHERE activo = 1");
+if ($result) {
+    $total_productos = $result->fetch_assoc()['total'];
+}
+
+// Productos con stock bajo (stock_actual <= stock_minimo Y stock_actual > 0)
+$stock_bajo = 0;
+$result = $conn->query("SELECT COUNT(*) as total FROM productos WHERE stock_actual <= stock_minimo AND stock_actual > 0 AND activo = 1");
+if ($result) {
+    $stock_bajo = $result->fetch_assoc()['total'];
+}
+
+// Productos con stock cero
+$stock_cero = 0;
+$result = $conn->query("SELECT COUNT(*) as total FROM productos WHERE stock_actual = 0 AND activo = 1");
+if ($result) {
+    $stock_cero = $result->fetch_assoc()['total'];
+}
+
+// Valor total del inventario (suma de precio_compra * stock_actual)
+$valor_inventario = 0;
+$result = $conn->query("SELECT COALESCE(SUM(precio_compra * stock_actual), 0) as total FROM productos WHERE activo = 1");
+if ($result) {
+    $valor_inventario = $result->fetch_assoc()['total'];
+}
+
+// ===== PRODUCTOS CON STOCK BAJO (para mostrar en tabla) =====
+$productos_bajo_stock = [];
+$result = $conn->query("
+    SELECT id, nombre, sku, stock_actual, stock_minimo
+    FROM productos 
+    WHERE stock_actual <= stock_minimo AND activo = 1 
+    ORDER BY stock_actual ASC 
+    LIMIT 5
+");
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
+        $productos_bajo_stock[] = $row;
+    }
+}
+
+// ===== ÚLTIMOS MOVIMIENTOS =====
+$movimientos = [];
+$result = $conn->query("
+    SELECT m.*, p.nombre as producto, p.sku, u.username 
+    FROM movimientos_inventario m
+    JOIN productos p ON m.id_producto = p.id
+    LEFT JOIN usuarios u ON m.id_usuario = u.id
+    ORDER BY m.fecha_movimiento DESC
+    LIMIT 5
+");
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
+        $movimientos[] = $row;
+    }
+}
+
 include '../header.php';
 ?>
 
@@ -13,11 +79,11 @@ include '../header.php';
     </div>
     
     <div class="pv-header-right" style="gap: 0.75rem;">
-        <a href="/dashboard/productos/entrada_rapida.php" class="btn-header" style="text-decoration: none;">
+        <a href="<?php echo url('dashboard/productos/entrada_rapida.php'); ?>" class="btn-header" style="text-decoration: none;">
             <i class="fas fa-barcode"></i>
             Entrada Rápida
         </a>
-        <a href="/dashboard/inventario/ajuste_masivo.php" class="btn-header" style="text-decoration: none; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white;">
+        <a href="<?php echo url('dashboard/inventario/ajuste_masivo.php'); ?>" class="btn-header" style="text-decoration: none; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white;">
             <i class="fas fa-cubes"></i>
             Ajuste Masivo
         </a>
@@ -33,7 +99,7 @@ include '../header.php';
         </div>
         <div class="estadistica-info">
             <span class="estadistica-label">Total Productos</span>
-            <span class="estadistica-valor">1,234</span>
+            <span class="estadistica-valor"><?php echo number_format($total_productos); ?></span>
             <span class="estadistica-sub">Activos en inventario</span>
         </div>
     </div>
@@ -45,8 +111,8 @@ include '../header.php';
         </div>
         <div class="estadistica-info">
             <span class="estadistica-label">Stock Bajo</span>
-            <span class="estadistica-valor">12</span>
-            <a href="/dashboard/inventario/stock_bajo.php" class="estadistica-link">
+            <span class="estadistica-valor"><?php echo number_format($stock_bajo); ?></span>
+            <a href="<?php echo url('dashboard/inventario/stock_bajo.php'); ?>" class="estadistica-link">
                 Ver lista <i class="fas fa-arrow-right"></i>
             </a>
         </div>
@@ -59,8 +125,8 @@ include '../header.php';
         </div>
         <div class="estadistica-info">
             <span class="estadistica-label">Stock Cero</span>
-            <span class="estadistica-valor">3</span>
-            <a href="/dashboard/inventario/stock_bajo.php?tipo=agotado" class="estadistica-link" style="color: var(--danger);">
+            <span class="estadistica-valor"><?php echo number_format($stock_cero); ?></span>
+            <a href="<?php echo url('dashboard/inventario/stock_bajo.php?tipo=agotado'); ?>" class="estadistica-link" style="color: var(--danger);">
                 Revisar urgentes <i class="fas fa-arrow-right"></i>
             </a>
         </div>
@@ -73,7 +139,7 @@ include '../header.php';
         </div>
         <div class="estadistica-info">
             <span class="estadistica-label">Valor del Inventario</span>
-            <span class="estadistica-valor">$145,678.90</span>
+            <span class="estadistica-valor">$<?php echo number_format($valor_inventario, 2); ?></span>
             <span class="estadistica-sub">Costo de compra</span>
         </div>
     </div>
@@ -88,7 +154,7 @@ include '../header.php';
                 <i class="fas fa-exclamation-circle" style="color: var(--warning);"></i>
                 Productos con Stock Bajo
             </h3>
-            <a href="/dashboard/inventario/stock_bajo.php" class="card-link">
+            <a href="<?php echo url('dashboard/inventario/stock_bajo.php'); ?>" class="card-link">
                 Ver todos <i class="fas fa-arrow-right"></i>
             </a>
         </div>
@@ -105,103 +171,48 @@ include '../header.php';
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- Producto 1 -->
-                        <tr class="fila-producto">
-                            <td>
-                                <div class="producto-info">
-                                    <span class="producto-nombre">Martillo de Uña 16oz</span>
-                                    <span class="producto-codigo">MT-001</span>
-                                </div>
-                            </td>
-                            <td class="text-center">
-                                <span class="stock-cantidad cero">0</span>
-                            </td>
-                            <td class="text-center text-gray-600">5</td>
-                            <td>
-                                <span class="badge-estado danger">Agotado</span>
-                            </td>
-                            <td>
-                                <a href="#" class="btn-accion-inventario" title="Ajustar stock">
-                                    <i class="fas fa-cubes"></i>
-                                </a>
-                            </td>
-                        </tr>
-                        
-                        <!-- Producto 2 -->
-                        <tr class="fila-producto">
-                            <td>
-                                <div class="producto-info">
-                                    <span class="producto-nombre">Taladro Percutor 500W</span>
-                                    <span class="producto-codigo">TL-023</span>
-                                </div>
-                            </td>
-                            <td class="text-center">
-                                <span class="stock-cantidad bajo">2</span>
-                            </td>
-                            <td class="text-center text-gray-600">3</td>
-                            <td>
-                                <span class="badge-estado warning">Stock Bajo</span>
-                            </td>
-                            <td>
-                                <a href="#" class="btn-accion-inventario" title="Ajustar stock">
-                                    <i class="fas fa-cubes"></i>
-                                </a>
-                            </td>
-                        </tr>
-                        
-                        <!-- Producto 3 -->
-                        <tr class="fila-producto">
-                            <td>
-                                <div class="producto-info">
-                                    <span class="producto-nombre">Caja de Tornillos 1/2"</span>
-                                    <span class="producto-codigo">TR-456</span>
-                                </div>
-                            </td>
-                            <td class="text-center">
-                                <span class="stock-cantidad bajo">3</span>
-                            </td>
-                            <td class="text-center text-gray-600">10</td>
-                            <td>
-                                <span class="badge-estado warning">Stock Bajo</span>
-                            </td>
-                            <td>
-                                <a href="#" class="btn-accion-inventario" title="Ajustar stock">
-                                    <i class="fas fa-cubes"></i>
-                                </a>
-                            </td>
-                        </tr>
-                        
-                        <!-- Producto 4 -->
-                        <tr class="fila-producto">
-                            <td>
-                                <div class="producto-info">
-                                    <span class="producto-nombre">Sierra Circular 7-1/4"</span>
-                                    <span class="producto-codigo">SR-789</span>
-                                </div>
-                            </td>
-                            <td class="text-center">
-                                <span class="stock-cantidad bajo">1</span>
-                            </td>
-                            <td class="text-center text-gray-600">2</td>
-                            <td>
-                                <span class="badge-estado warning">Stock Bajo</span>
-                            </td>
-                            <td>
-                                <a href="#" class="btn-accion-inventario" title="Ajustar stock">
-                                    <i class="fas fa-cubes"></i>
-                                </a>
-                            </td>
-                        </tr>
+                        <?php if (empty($productos_bajo_stock)): ?>
+                            <tr>
+                                <td colspan="5" class="empty-state-row">
+                                    <div class="empty-state-small">
+                                        <i class="fas fa-check-circle" style="color: var(--success); font-size: 2rem;"></i>
+                                        <p>¡Todo bien! No hay productos con stock bajo</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($productos_bajo_stock as $p): ?>
+                            <tr class="fila-producto">
+                                <td>
+                                    <div class="producto-info">
+                                        <span class="producto-nombre"><?php echo h($p['nombre']); ?></span>
+                                        <span class="producto-codigo"><?php echo h($p['sku']); ?></span>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="stock-cantidad <?php echo $p['stock_actual'] == 0 ? 'cero' : 'bajo'; ?>">
+                                        <?php echo $p['stock_actual']; ?>
+                                    </span>
+                                </td>
+                                <td class="text-center"><?php echo $p['stock_minimo']; ?></td>
+                                <td>
+                                    <?php if ($p['stock_actual'] == 0): ?>
+                                        <span class="badge-estado danger">Agotado</span>
+                                    <?php else: ?>
+                                        <span class="badge-estado warning">Stock Bajo</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <a href="<?php echo url('dashboard/productos/ajustar_stock.php?id=' . $p['id']); ?>" class="btn-accion-inventario" title="Ajustar stock">
+                                        <i class="fas fa-cubes"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
-            
-            <!-- Empty state (comentado) 
-            <div class="empty-state-small">
-                <i class="fas fa-check-circle" style="color: var(--success); font-size: 2rem;"></i>
-                <p>¡Todo bien! No hay productos con stock bajo</p>
-            </div>
-            -->
         </div>
     </div>
     
@@ -212,7 +223,7 @@ include '../header.php';
                 <i class="fas fa-history"></i>
                 Últimos Movimientos
             </h3>
-            <a href="/dashboard/inventario/movimientos.php" class="card-link">
+            <a href="<?php echo url('dashboard/inventario/movimientos.php'); ?>" class="card-link">
                 Ver todos <i class="fas fa-arrow-right"></i>
             </a>
         </div>
@@ -229,89 +240,51 @@ include '../header.php';
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- Movimiento 1 -->
-                        <tr class="fila-movimiento">
-                            <td class="fecha-movimiento">
-                                <span class="fecha-dia">15/03</span>
-                                <span class="fecha-hora">14:30</span>
-                            </td>
-                            <td>
-                                <div class="producto-info">
-                                    <span class="producto-nombre">Cemento Portland</span>
-                                    <span class="producto-codigo">Admin</span>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="badge-tipo entrada">Entrada</span>
-                            </td>
-                            <td class="text-center cantidad entrada">+50</td>
-                            <td class="text-center">
-                                <span class="stock-evolucion">245 → 295</span>
-                            </td>
-                        </tr>
-                        
-                        <!-- Movimiento 2 -->
-                        <tr class="fila-movimiento">
-                            <td class="fecha-movimiento">
-                                <span class="fecha-dia">15/03</span>
-                                <span class="fecha-hora">12:15</span>
-                            </td>
-                            <td>
-                                <div class="producto-info">
-                                    <span class="producto-nombre">Varilla 3/8"</span>
-                                    <span class="producto-codigo">Sistema</span>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="badge-tipo salida">Salida</span>
-                            </td>
-                            <td class="text-center cantidad salida">-20</td>
-                            <td class="text-center">
-                                <span class="stock-evolucion">856 → 836</span>
-                            </td>
-                        </tr>
-                        
-                        <!-- Movimiento 3 -->
-                        <tr class="fila-movimiento">
-                            <td class="fecha-movimiento">
-                                <span class="fecha-dia">14/03</span>
-                                <span class="fecha-hora">18:20</span>
-                            </td>
-                            <td>
-                                <div class="producto-info">
-                                    <span class="producto-nombre">Taladro Percutor</span>
-                                    <span class="producto-codigo">Admin</span>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="badge-tipo ajuste">Ajuste</span>
-                            </td>
-                            <td class="text-center cantidad ajuste">-2</td>
-                            <td class="text-center">
-                                <span class="stock-evolucion">4 → 2</span>
-                            </td>
-                        </tr>
-                        
-                        <!-- Movimiento 4 -->
-                        <tr class="fila-movimiento">
-                            <td class="fecha-movimiento">
-                                <span class="fecha-dia">14/03</span>
-                                <span class="fecha-hora">16:00</span>
-                            </td>
-                            <td>
-                                <div class="producto-info">
-                                    <span class="producto-nombre">Pintura Blanca 20L</span>
-                                    <span class="producto-codigo">María G.</span>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="badge-tipo entrada">Entrada</span>
-                            </td>
-                            <td class="text-center cantidad entrada">+15</td>
-                            <td class="text-center">
-                                <span class="stock-evolucion">23 → 38</span>
-                            </td>
-                        </tr>
+                        <?php if (empty($movimientos)): ?>
+                            <tr>
+                                <td colspan="5" class="empty-state-row">
+                                    <div class="empty-state-small">
+                                        <i class="fas fa-history" style="color: var(--gray-400); font-size: 2rem;"></i>
+                                        <p>No hay movimientos registrados</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($movimientos as $m): ?>
+                            <tr class="fila-movimiento">
+                                <td class="fecha-movimiento">
+                                    <span class="fecha-dia"><?php echo date('d/m', strtotime($m['fecha_movimiento'])); ?></span>
+                                    <span class="fecha-hora"><?php echo date('H:i', strtotime($m['fecha_movimiento'])); ?></span>
+                                </td>
+                                <td>
+                                    <div class="producto-info">
+                                        <span class="producto-nombre"><?php echo h($m['producto']); ?></span>
+                                        <span class="producto-codigo"><?php echo h($m['username'] ?? 'Sistema'); ?></span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge-tipo <?php echo $m['tipo']; ?>">
+                                        <?php 
+                                        echo $m['tipo'] == 'entrada' ? 'Entrada' : 
+                                            ($m['tipo'] == 'salida' ? 'Salida' : 'Ajuste'); 
+                                        ?>
+                                    </span>
+                                </td>
+                                <td class="text-center cantidad <?php echo $m['tipo']; ?>">
+                                    <?php 
+                                    echo $m['tipo'] == 'entrada' ? '+' : 
+                                        ($m['tipo'] == 'salida' ? '-' : '±'); 
+                                    echo $m['cantidad']; 
+                                    ?>
+                                </td>
+                                <td class="text-center">
+                                    <span class="stock-evolucion">
+                                        <?php echo $m['stock_anterior']; ?> → <?php echo $m['stock_nuevo']; ?>
+                                    </span>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
@@ -321,7 +294,7 @@ include '../header.php';
 
 <!-- Acciones rápidas de inventario -->
 <div class="acciones-rapidas-grid">
-    <a href="/dashboard/productos/nuevo.php" class="accion-rapida-card">
+    <a href="<?php echo url('dashboard/productos/nuevo.php'); ?>" class="accion-rapida-card">
         <div class="accion-icon blue">
             <i class="fas fa-box"></i>
         </div>
@@ -331,7 +304,7 @@ include '../header.php';
         </div>
     </a>
     
-    <a href="/dashboard/productos/entrada_rapida.php" class="accion-rapida-card">
+    <a href="<?php echo url('dashboard/productos/entrada_rapida.php'); ?>" class="accion-rapida-card">
         <div class="accion-icon green">
             <i class="fas fa-barcode"></i>
         </div>
@@ -341,7 +314,7 @@ include '../header.php';
         </div>
     </a>
     
-    <a href="/dashboard/inventario/stock_bajo.php" class="accion-rapida-card">
+    <a href="<?php echo url('dashboard/inventario/stock_bajo.php'); ?>" class="accion-rapida-card">
         <div class="accion-icon yellow">
             <i class="fas fa-exclamation-triangle"></i>
         </div>
@@ -377,6 +350,31 @@ include '../header.php';
 .fila-movimiento:nth-child(3) { animation-delay: 0.15s; }
 .fila-producto:nth-child(4),
 .fila-movimiento:nth-child(4) { animation-delay: 0.2s; }
+.fila-producto:nth-child(5),
+.fila-movimiento:nth-child(5) { animation-delay: 0.25s; }
+
+/* Estilos para empty state */
+.empty-state-row {
+    text-align: center;
+    padding: 2rem !important;
+}
+
+.empty-state-small {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--gray-500);
+}
+
+.empty-state-small i {
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-small p {
+    margin: 0;
+    font-size: 0.9rem;
+}
 </style>
 
 <?php include '../footer.php'; ?>

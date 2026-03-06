@@ -1,4 +1,7 @@
 <?php
+require_once dirname(__DIR__) . '/config.php';
+requiereAuth(); // Esto protegerá todas las páginas que usen este header
+$usuario_actual = getCurrentUser();
 // Configuración ya está incluida desde el principio
 require_once dirname(__DIR__) . '/config.php';
 ?>
@@ -10,36 +13,94 @@ require_once dirname(__DIR__) . '/config.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo APP_NAME; ?> - Dashboard</title>
     
-    <!-- CSS con rutas dinámicas -->
+    <!-- CSS Principal -->
     <link rel="stylesheet" href="<?php echo asset('css/main.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/header.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/sidebar.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/dashboard.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/ventas.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/historial.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/inventario.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/servicios.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/productos.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/producto-form.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/producto-ver.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/ajustar-stock.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/categorias.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/categoria-form.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/marcas.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/stock-bajo.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/entrada_rapida.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/movimientos.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/clientes.css'); ?>">
-    <link rel="stylesheet" href="<?php echo asset('css/cliente-form.css'); ?>">
     
-
-
+    <!-- Layout -->
+    <link rel="stylesheet" href="<?php echo asset('css/layout/header.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('css/layout/sidebar.css'); ?>">
+    
+    <!-- Componentes (SIEMPRE CARGARLOS) -->
+    <link rel="stylesheet" href="<?php echo asset('css/components/buttons.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('css/components/cards.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('css/components/tables.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('css/components/forms.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('css/components/modals.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('css/components/alerts.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('css/components/badges.css'); ?>">
+    
+    <!-- Páginas específicas (con parámetro para evitar caché) -->
+    <?php
+    $uri = $_SERVER['REQUEST_URI'];
+    $version = time(); // Versión única para evitar caché
+    
+    if (strpos($uri, 'dashboard/index.php') !== false) {
+        echo '<link rel="stylesheet" href="' . asset('css/pages/dashboard.css') . '?v=' . $version . '">';
+    }
+    
+    if (strpos($uri, 'ventas/index.php') !== false) {
+        echo '<link rel="stylesheet" href="' . asset('css/pages/ventas.css') . '?v=' . $version . '">';
+    }
+    
+    if (strpos($uri, 'ventas/historial.php') !== false) {
+        echo '<link rel="stylesheet" href="' . asset('css/pages/historial.css') . '?v=' . $version . '">';
+    }
+    
+    if (strpos($uri, 'productos/index.php') !== false) {
+        echo '<link rel="stylesheet" href="' . asset('css/pages/productos.css') . '?v=' . $version . '">';
+    }
+    
+    if (strpos($uri, 'productos/ver.php') !== false) {
+        echo '<link rel="stylesheet" href="' . asset('css/pages/producto-ver.css') . '?v=' . $version . '">';
+    }
+    
+    if (strpos($uri, 'productos/nuevo.php') !== false || strpos($uri, 'productos/editar.php') !== false) {
+        echo '<link rel="stylesheet" href="' . asset('css/pages/producto-form.css') . '?v=' . $version . '">';
+    }
+    
+    if (strpos($uri, 'productos/ajustar_stock.php') !== false) {
+        echo '<link rel="stylesheet" href="' . asset('css/pages/ajustar-stock.css') . '?v=' . $version . '">';
+    }
+    
+    if (strpos($uri, 'inventario/entrada_rapida.php') !== false) {
+        echo '<link rel="stylesheet" href="' . asset('css/pages/entrada-rapida.css') . '?v=' . $version . '">';
+    }
+    
+    if (strpos($uri, 'inventario/movimientos.php') !== false) {
+        echo '<link rel="stylesheet" href="' . asset('css/pages/movimientos.css') . '?v=' . $version . '">';
+    }
+    
+    if (strpos($uri, 'inventario/stock_bajo.php') !== false) {
+        echo '<link rel="stylesheet" href="' . asset('css/pages/stock-bajo.css') . '?v=' . $version . '">';
+    }
+    
+    if (strpos($uri, 'categorias/index.php') !== false) {
+        echo '<link rel="stylesheet" href="' . asset('css/pages/categorias.css') . '?v=' . $version . '">';
+    }
+    
+    if (strpos($uri, 'categorias/nuevo.php') !== false || strpos($uri, 'categorias/editar.php') !== false) {
+        echo '<link rel="stylesheet" href="' . asset('css/pages/categoria-form.css') . '?v=' . $version . '">';
+    }
+    
+    if (strpos($uri, 'marcas/index.php') !== false) {
+        echo '<link rel="stylesheet" href="' . asset('css/pages/marcas.css') . '?v=' . $version . '">';
+    }
+    
+    if (strpos($uri, 'clientes/index.php') !== false) {
+        echo '<link rel="stylesheet" href="' . asset('css/pages/clientes.css') . '?v=' . $version . '">';
+    }
+    
+    if (strpos($uri, 'clientes/nuevo.php') !== false || strpos($uri, 'clientes/editar.php') !== false) {
+        echo '<link rel="stylesheet" href="' . asset('css/pages/cliente-form.css') . '?v=' . $version . '">';
+    }
+    
+    if (strpos($uri, 'reportes/corte_caja.php') !== false) {
+        echo '<link rel="stylesheet" href="' . asset('css/pages/corte_caja.css') . '?v=' . $version . '">';
+    }
+    ?>
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <!-- Header fijo -->

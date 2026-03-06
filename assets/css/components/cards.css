@@ -1,0 +1,438 @@
+/* ========================================
+   CARDS.CSS - TODAS LAS TARJETAS DEL SISTEMA
+   ======================================== */
+
+/* Tarjetas base */
+.card {
+    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s;
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--primary);
+}
+
+.card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-title i { color: var(--primary); }
+
+.card-link {
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 0.75rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background-color: var(--primary-alpha);
+    border-radius: var(--radius-md);
+    transition: all 0.2s;
+}
+
+.card-link:hover {
+    background-color: var(--primary);
+    color: white;
+}
+
+.card-body { padding: 1.25rem; }
+
+/* Tarjetas de estadísticas */
+.estadistica-card {
+    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s;
+}
+
+.estadistica-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.estadistica-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.estadistica-icon.blue {
+    background: linear-gradient(135deg, var(--info-light) 0%, #bfdbfe 100%);
+    color: var(--info);
+}
+
+.estadistica-icon.green {
+    background: linear-gradient(135deg, var(--success-light) 0%, #a7f3d0 100%);
+    color: var(--success);
+}
+
+.estadistica-icon.yellow {
+    background: linear-gradient(135deg, var(--warning-light) 0%, #fed7aa 100%);
+    color: var(--warning);
+}
+
+.estadistica-icon.red {
+    background: linear-gradient(135deg, var(--danger-light) 0%, #fee2e2 100%);
+    color: var(--danger);
+}
+
+.estadistica-info { flex: 1; }
+
+.estadistica-label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin-bottom: 0.25rem;
+}
+
+.estadistica-valor {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--gray-800);
+}
+
+.estadistica-sub {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--gray-500);
+    margin-top: 0.25rem;
+}
+
+.estadistica-link {
+    display: inline-block;
+    font-size: 0.7rem;
+    color: var(--primary);
+    text-decoration: none;
+    margin-top: 0.25rem;
+    font-weight: 500;
+}
+
+.estadistica-link i { font-size: 0.6rem; margin-left: 0.2rem; }
+.estadistica-link:hover { text-decoration: underline; }
+
+/* Tarjeta de producto destacado (Punto de Venta) */
+.producto-destacado {
+    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+    border: 2px solid var(--primary);
+    border-radius: var(--radius-lg);
+    padding: 0.75rem 1.25rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.15);
+    animation: fadeIn 0.3s ease;
+    flex-shrink: 0;
+}
+
+.producto-destacado-imagen {
+    width: 70px;
+    height: 70px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 2px solid white;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    background: white;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.producto-destacado-imagen img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.producto-destacado-info h2 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin: 0 0 0.25rem 0;
+}
+
+.producto-destacado-detalles {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.destacado-sku,
+.destacado-codigo,
+.destacado-precio,
+.destacado-stock {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+    color: var(--gray-600);
+    background: var(--gray-50);
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
+}
+
+.destacado-sku i,
+.destacado-codigo i,
+.destacado-precio i,
+.destacado-stock i {
+    color: var(--primary);
+    font-size: 0.8rem;
+}
+
+.destacado-precio {
+    background: linear-gradient(135deg, var(--primary-alpha), var(--secondary-alpha));
+    color: var(--primary);
+    font-weight: 600;
+}
+
+/* Tarjeta de producto para ajustar stock */
+.producto-info-card {
+    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--shadow-md);
+}
+
+.producto-info-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.producto-nombre {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin: 0;
+}
+
+.producto-codigos {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.codigo-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: var(--gray-100);
+    padding: 0.3rem 1rem;
+    border-radius: var(--radius-lg);
+}
+
+.codigo-label {
+    font-size: 0.7rem;
+    color: var(--gray-500);
+    text-transform: uppercase;
+}
+
+.codigo-valor {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--gray-800);
+}
+
+.codigo-valor.sku { color: var(--primary); }
+
+/* Tarjeta de producto encontrado (entrada rápida) */
+.producto-encontrado-card {
+    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    animation: fadeInUp 0.3s ease-out;
+}
+
+.producto-encontrado-header {
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.producto-encontrado-header h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: white;
+    margin: 0;
+}
+
+.badge-activo {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 0.25rem 1rem;
+    border-radius: var(--radius-lg);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.producto-encontrado-body {
+    padding: 1.5rem;
+    display: flex;
+    gap: 2rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.producto-imagen {
+    width: 180px;
+    height: 180px;
+    background-color: var(--gray-100);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 1px solid var(--gray-200);
+}
+
+.producto-imagen img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* Tarjeta de último producto (columna derecha) */
+.ultimo-producto-card {
+    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-lg);
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.ultimo-producto-titulo {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    margin: 0 0 1rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: center;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ultimo-producto-titulo i { color: var(--primary); }
+
+.ultimo-producto-imagen {
+    width: 180px;
+    height: 180px;
+    margin: 0 auto 1rem;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 3px solid var(--gray-200);
+    box-shadow: var(--shadow-lg);
+    background: linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    transition: transform 0.3s ease;
+}
+
+.ultimo-producto-imagen:hover {
+    transform: scale(1.02);
+    border-color: var(--primary);
+}
+
+.ultimo-producto-imagen img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+/* Tarjeta de resumen de venta */
+.resumen-venta-card {
+    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.resumen-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--primary);
+}
+
+.resumen-header i {
+    font-size: 1.2rem;
+    color: var(--primary);
+    background: var(--primary-alpha);
+    padding: 0.5rem;
+    border-radius: var(--radius-md);
+}
+
+.resumen-header h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin: 0;
+}
+
+.resumen-items {
+    background: linear-gradient(135deg, var(--primary-alpha), var(--secondary-alpha));
+    padding: 0.75rem;
+    border-radius: var(--radius-lg);
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: center;
+    border: 1px solid var(--primary-light);
+}
+
+.resumen-items i { color: var(--primary); }
+.resumen-items span {
+    font-weight: 600;
+    color: var(--gray-800);
+    font-size: 0.95rem;
+}

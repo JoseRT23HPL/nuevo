@@ -1,97 +1,8 @@
 <?php
-include '../header.php';
+require_once '../../config.php';
+requiereAuth();
 
-// Datos de ejemplo para movimientos de inventario
-$movimientos = [
-    [
-        'fecha' => '2024-03-15 14:30:00',
-        'producto' => 'Martillo de Uña 16oz',
-        'codigo_barras' => '750123456789',
-        'tipo' => 'entrada',
-        'cantidad' => 50,
-        'stock_anterior' => 195,
-        'stock_nuevo' => 245,
-        'motivo' => 'Compra a proveedor',
-        'usuario' => 'Admin User'
-    ],
-    [
-        'fecha' => '2024-03-15 11:20:00',
-        'producto' => 'Taladro Percutor 500W',
-        'codigo_barras' => '750123456788',
-        'tipo' => 'salida',
-        'cantidad' => 2,
-        'stock_anterior' => 10,
-        'stock_nuevo' => 8,
-        'motivo' => 'Venta #V-001234',
-        'usuario' => 'María G.'
-    ],
-    [
-        'fecha' => '2024-03-14 09:45:00',
-        'producto' => 'Caja de Tornillos 1/2"',
-        'codigo_barras' => '750123456787',
-        'tipo' => 'ajuste',
-        'cantidad' => 5,
-        'stock_anterior' => 20,
-        'stock_nuevo' => 25,
-        'motivo' => 'Ajuste por inventario',
-        'usuario' => 'Carlos R.'
-    ],
-    [
-        'fecha' => '2024-03-14 16:20:00',
-        'producto' => 'Cemento Portland Gris 50kg',
-        'codigo_barras' => '750123456786',
-        'tipo' => 'entrada',
-        'cantidad' => 100,
-        'stock_anterior' => 50,
-        'stock_nuevo' => 150,
-        'motivo' => 'Compra a proveedor',
-        'usuario' => 'Admin User'
-    ],
-    [
-        'fecha' => '2024-03-13 10:15:00',
-        'producto' => 'Pintura Blanca 20L',
-        'codigo_barras' => '750123456785',
-        'tipo' => 'salida',
-        'cantidad' => 3,
-        'stock_anterior' => 15,
-        'stock_nuevo' => 12,
-        'motivo' => 'Venta #V-001230',
-        'usuario' => 'Laura M.'
-    ],
-    [
-        'fecha' => '2024-03-13 08:30:00',
-        'producto' => 'Cable Eléctrico Calibre 12',
-        'codigo_barras' => '750123456784',
-        'tipo' => 'ajuste',
-        'cantidad' => 2,
-        'stock_anterior' => 18,
-        'stock_nuevo' => 20,
-        'motivo' => 'Ajuste por conteo',
-        'usuario' => 'Sistema'
-    ],
-    [
-        'fecha' => '2024-03-12 15:40:00',
-        'producto' => 'Disco de Corte 7"',
-        'codigo_barras' => '750123456783',
-        'tipo' => 'entrada',
-        'cantidad' => 30,
-        'stock_anterior' => 45,
-        'stock_nuevo' => 75,
-        'motivo' => 'Compra a proveedor',
-        'usuario' => 'Admin User'
-    ],
-    [
-        'fecha' => '2024-03-12 12:10:00',
-        'producto' => 'Guantes de Seguridad',
-        'codigo_barras' => '750123456782',
-        'tipo' => 'salida',
-        'cantidad' => 5,
-        'stock_anterior' => 25,
-        'stock_nuevo' => 20,
-        'motivo' => 'Venta #V-001228',
-        'usuario' => 'María G.'
-    ]
-];
+$conn = getDB();
 
 // Obtener filtros actuales
 $fecha_inicio = $_GET['fecha_inicio'] ?? date('Y-m-01');
@@ -99,25 +10,63 @@ $fecha_fin = $_GET['fecha_fin'] ?? date('Y-m-d');
 $tipo_filtro = $_GET['tipo'] ?? '';
 $producto_filtro = $_GET['producto'] ?? '';
 
-// Filtrar movimientos (simulación)
-$movimientos_filtrados = array_filter($movimientos, function($m) use ($fecha_inicio, $fecha_fin, $tipo_filtro, $producto_filtro) {
-    // Filtro por fecha
-    $fecha_mov = date('Y-m-d', strtotime($m['fecha']));
-    if ($fecha_mov < $fecha_inicio || $fecha_mov > $fecha_fin) return false;
-    
-    // Filtro por tipo
-    if (!empty($tipo_filtro) && $m['tipo'] != $tipo_filtro) return false;
-    
-    // Filtro por producto
-    if (!empty($producto_filtro) && stripos($m['producto'], $producto_filtro) === false) return false;
-    
-    return true;
-});
+// Construir condiciones WHERE
+$condiciones = [];
+$params = [];
+$types = "";
+
+// Filtro por fecha
+if (!empty($fecha_inicio) && !empty($fecha_fin)) {
+    $condiciones[] = "DATE(m.fecha_movimiento) BETWEEN ? AND ?";
+    $params[] = $fecha_inicio;
+    $params[] = $fecha_fin;
+    $types .= "ss";
+}
+
+// Filtro por tipo
+if (!empty($tipo_filtro)) {
+    $condiciones[] = "m.tipo = ?";
+    $params[] = $tipo_filtro;
+    $types .= "s";
+}
+
+// Filtro por producto (búsqueda en nombre)
+if (!empty($producto_filtro)) {
+    $condiciones[] = "p.nombre LIKE ?";
+    $params[] = "%$producto_filtro%";
+    $types .= "s";
+}
+
+$where = empty($condiciones) ? "1=1" : implode(" AND ", $condiciones);
+
+// Obtener movimientos con filtros
+$sql = "
+    SELECT m.*, p.nombre as producto, p.codigo_barras, p.sku, u.username 
+    FROM movimientos_inventario m
+    JOIN productos p ON m.id_producto = p.id
+    LEFT JOIN usuarios u ON m.id_usuario = u.id
+    WHERE $where
+    ORDER BY m.fecha_movimiento DESC
+";
+
+$stmt = $conn->prepare($sql);
+if (!empty($params)) {
+    $stmt->bind_param($types, ...$params);
+}
+$stmt->execute();
+$result = $stmt->get_result();
+
+$movimientos = [];
+while ($row = $result->fetch_assoc()) {
+    $movimientos[] = $row;
+}
 
 // Calcular estadísticas
-$total_entradas = count(array_filter($movimientos_filtrados, function($m) { return $m['tipo'] == 'entrada'; }));
-$total_salidas = count(array_filter($movimientos_filtrados, function($m) { return $m['tipo'] == 'salida'; }));
-$total_ajustes = count(array_filter($movimientos_filtrados, function($m) { return $m['tipo'] == 'ajuste'; }));
+$total_entradas = count(array_filter($movimientos, function($m) { return $m['tipo'] == 'entrada'; }));
+$total_salidas = count(array_filter($movimientos, function($m) { return $m['tipo'] == 'salida'; }));
+$total_ajustes = count(array_filter($movimientos, function($m) { return $m['tipo'] == 'ajuste'; }));
+
+include '../header.php';
 ?>
 
 <!-- Header de la página -->
@@ -131,7 +80,7 @@ $total_ajustes = count(array_filter($movimientos_filtrados, function($m) { retur
     </div>
     
     <div class="pv-header-right">
-        <a href="/dashboard/inventario/index.php" class="btn-header" style="text-decoration: none;">
+        <a href="<?php echo url('dashboard/inventario/index.php'); ?>" class="btn-header" style="text-decoration: none;">
             <i class="fas fa-arrow-left"></i>
             Volver a Inventario
         </a>
@@ -191,7 +140,7 @@ $total_ajustes = count(array_filter($movimientos_filtrados, function($m) { retur
                     Filtrar
                 </button>
                 
-                <a href="/dashboard/inventario/movimientos.php" class="btn-filtro btn-secondary" style="text-decoration: none; text-align: center;">
+                <a href="<?php echo url('dashboard/inventario/movimientos.php'); ?>" class="btn-filtro btn-secondary" style="text-decoration: none; text-align: center;">
                     <i class="fas fa-times"></i>
                     Limpiar
                 </a>
@@ -208,7 +157,7 @@ $total_ajustes = count(array_filter($movimientos_filtrados, function($m) { retur
                 <tr>
                     <th>Fecha</th>
                     <th>Producto</th>
-                    <th>Código</th>
+                    <th>Código/SKU</th>
                     <th class="text-center">Tipo</th>
                     <th class="text-right">Cantidad</th>
                     <th class="text-right">Stock Ant.</th>
@@ -218,18 +167,19 @@ $total_ajustes = count(array_filter($movimientos_filtrados, function($m) { retur
                 </tr>
             </thead>
             <tbody>
-                <?php if (count($movimientos_filtrados) > 0): ?>
-                    <?php foreach ($movimientos_filtrados as $m): ?>
+                <?php if (count($movimientos) > 0): ?>
+                    <?php foreach ($movimientos as $m): ?>
                     <tr class="fila-movimiento">
                         <td class="col-fecha">
-                            <span class="fecha-dia"><?php echo date('d/m/Y', strtotime($m['fecha'])); ?></span>
-                            <span class="fecha-hora"><?php echo date('H:i', strtotime($m['fecha'])); ?></span>
+                            <span class="fecha-dia"><?php echo date('d/m/Y', strtotime($m['fecha_movimiento'])); ?></span>
+                            <span class="fecha-hora"><?php echo date('H:i', strtotime($m['fecha_movimiento'])); ?></span>
                         </td>
                         <td class="col-producto">
-                            <span class="producto-nombre"><?php echo $m['producto']; ?></span>
+                            <span class="producto-nombre"><?php echo h($m['producto']); ?></span>
+                            <small class="producto-sku">SKU: <?php echo h($m['sku']); ?></small>
                         </td>
                         <td class="col-codigo">
-                            <span class="codigo-valor"><?php echo $m['codigo_barras']; ?></span>
+                            <span class="codigo-valor"><?php echo $m['codigo_barras'] ?: '—'; ?></span>
                         </td>
                         <td class="text-center">
                             <?php
@@ -268,10 +218,10 @@ $total_ajustes = count(array_filter($movimientos_filtrados, function($m) { retur
                         ?>">
                             <?php echo $m['stock_nuevo']; ?>
                         </td>
-                        <td class="col-motivo" title="<?php echo $m['motivo']; ?>">
-                            <?php echo $m['motivo']; ?>
+                        <td class="col-motivo" title="<?php echo h($m['motivo']); ?>">
+                            <?php echo h($m['motivo']); ?>
                         </td>
-                        <td class="col-usuario"><?php echo $m['usuario']; ?></td>
+                        <td class="col-usuario"><?php echo $m['username'] ?: 'Sistema'; ?></td>
                     </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
@@ -283,11 +233,11 @@ $total_ajustes = count(array_filter($movimientos_filtrados, function($m) { retur
                             <h3>No hay movimientos registrados</h3>
                             <p>Prueba con otros filtros o realiza algún movimiento</p>
                             <div class="empty-state-actions">
-                                <a href="/dashboard/inventario/index.php" class="btn-primary">
+                                <a href="<?php echo url('dashboard/inventario/index.php'); ?>" class="btn-primary">
                                     <i class="fas fa-arrow-left"></i>
                                     Volver al inventario
                                 </a>
-                                <a href="/dashboard/productos/entrada_rapida.php" class="btn-success">
+                                <a href="<?php echo url('dashboard/productos/entrada_rapida.php'); ?>" class="btn-success">
                                     <i class="fas fa-barcode"></i>
                                     Registrar entrada
                                 </a>
@@ -300,12 +250,12 @@ $total_ajustes = count(array_filter($movimientos_filtrados, function($m) { retur
     </div>
     
     <!-- Resumen -->
-    <?php if (count($movimientos_filtrados) > 0): ?>
+    <?php if (count($movimientos) > 0): ?>
     <div class="tabla-footer">
         <div class="resumen-wrapper">
             <p class="resumen-info">
                 <i class="fas fa-chart-bar"></i>
-                Total de movimientos: <strong><?php echo count($movimientos_filtrados); ?></strong>
+                Total de movimientos: <strong><?php echo count($movimientos); ?></strong>
             </p>
             <div class="resumen-stats">
                 <span class="stat-badge entrada">
@@ -351,6 +301,53 @@ $total_ajustes = count(array_filter($movimientos_filtrados, function($m) { retur
 .fila-movimiento:nth-child(6) { animation-delay: 0.12s; }
 .fila-movimiento:nth-child(7) { animation-delay: 0.14s; }
 .fila-movimiento:nth-child(8) { animation-delay: 0.16s; }
+
+/* Mejoras en la tabla */
+.col-producto {
+    min-width: 180px;
+}
+
+.producto-sku {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--gray-500);
+    margin-top: 0.2rem;
+}
+
+.codigo-valor {
+    font-size: 0.8rem;
+    color: var(--gray-600);
+    background-color: var(--gray-100);
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-md);
+    font-family: monospace;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .filtros-grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+    }
+    
+    .filtro-group[style*="span 2"] {
+        grid-column: span 3 !important;
+    }
+    
+    .filtro-botones {
+        grid-column: span 3 !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .filtros-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .filtro-group[style*="span 2"],
+    .filtro-botones {
+        grid-column: span 1 !important;
+    }
+}
 </style>
 
 <?php include '../footer.php'; ?>

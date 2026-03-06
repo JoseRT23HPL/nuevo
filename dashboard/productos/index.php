@@ -1,4 +1,105 @@
 <?php
+require_once '../../config.php';
+requiereAuth();
+
+$conn = getDB();
+
+// ===== CONFIGURACIÓN PARA GRANDES VOLÚMENES =====
+$limite = 500; // 500 productos por página (ideal para 10,000+)
+$pagina = isset($_GET['pagina']) ? (int)$_GET['pagina'] : 1;
+$offset = ($pagina - 1) * $limite;
+
+// Obtener filtros
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+$categoria_id = isset($_GET['categoria']) ? (int)$_GET['categoria'] : 0;
+$marca_id = isset($_GET['marca']) ? (int)$_GET['marca'] : 0;
+$stock_filtro = isset($_GET['stock']) ? $_GET['stock'] : '';
+
+// ===== INDICADOR DE CARGA PARA EL USUARIO =====
+$tiempo_inicio = microtime(true);
+
+// Construir condiciones WHERE
+$condiciones = ["p.activo = 1"];
+$params = [];
+$types = "";
+
+// Búsqueda por texto
+if (!empty($search)) {
+    $condiciones[] = "(p.nombre LIKE ? OR p.sku LIKE ? OR p.codigo_barras LIKE ? OR p.descripcion LIKE ?)";
+    $search_param = "%$search%";
+    $params[] = $search_param;
+    $params[] = $search_param;
+    $params[] = $search_param;
+    $params[] = $search_param;
+    $types .= "ssss";
+}
+
+// Filtro por categoría
+if ($categoria_id > 0) {
+    $condiciones[] = "p.id_categoria = ?";
+    $params[] = $categoria_id;
+    $types .= "i";
+}
+
+// Filtro por marca
+if ($marca_id > 0) {
+    $condiciones[] = "p.id_marca = ?";
+    $params[] = $marca_id;
+    $types .= "i";
+}
+
+// Filtro por stock
+if ($stock_filtro == 'bajo') {
+    $condiciones[] = "p.stock_actual <= p.stock_minimo AND p.stock_actual > 0";
+} elseif ($stock_filtro == 'agotado') {
+    $condiciones[] = "p.stock_actual = 0";
+}
+
+$where = implode(" AND ", $condiciones);
+
+// ===== CONTAR TOTAL (con índices para velocidad) =====
+$count_sql = "SELECT COUNT(*) as total FROM productos p WHERE $where";
+$count_stmt = $conn->prepare($count_sql);
+
+if (!empty($params)) {
+    $count_stmt->bind_param($types, ...$params);
+}
+$count_stmt->execute();
+$total_productos = $count_stmt->get_result()->fetch_assoc()['total'];
+$total_paginas = ceil($total_productos / $limite);
+
+// ===== OBTENER PRODUCTOS (solo los campos necesarios) =====
+// NOTA: Seleccionamos SOLO los campos que vamos a mostrar
+$sql = "
+    SELECT p.id, p.sku, p.codigo_barras, p.nombre, p.descripcion, 
+           p.precio_venta, p.stock_actual, p.stock_minimo, p.activo,
+           c.nombre as categoria_nombre,
+           m.nombre as marca_nombre
+    FROM productos p
+    LEFT JOIN categorias c ON p.id_categoria = c.id
+    LEFT JOIN marcas m ON p.id_marca = m.id
+    WHERE $where
+    ORDER BY p.fecha_creacion DESC
+    LIMIT ? OFFSET ?
+";
+
+$params_paginacion = $params;
+$params_paginacion[] = $limite;
+$params_paginacion[] = $offset;
+$types_paginacion = $types . "ii";
+
+$stmt = $conn->prepare($sql);
+$stmt->bind_param($types_paginacion, ...$params_paginacion);
+$stmt->execute();
+$productos = $stmt->get_result();
+
+$tiempo_fin = microtime(true);
+$tiempo_carga = round(($tiempo_fin - $tiempo_inicio) * 1000, 2);
+
+// Obtener categorías y marcas para filtros (solo ID y nombre)
+$categorias = $conn->query("SELECT id, nombre FROM categorias WHERE activo = 1 ORDER BY nombre");
+$marcas = $conn->query("SELECT id, nombre FROM marcas WHERE activo = 1 ORDER BY nombre");
+
 include '../header.php';
 ?>
 
@@ -13,7 +114,7 @@ include '../header.php';
     </div>
     
     <div class="pv-header-right">
-        <a href="/dashboard/productos/nuevo.php" class="btn-header primary" style="text-decoration: none;">
+        <a href="<?php echo url('dashboard/productos/nuevo.php'); ?>" class="btn-header primary" style="text-decoration: none;">
             <i class="fas fa-plus"></i>
             Nuevo Producto
         </a>
@@ -22,36 +123,44 @@ include '../header.php';
 
 <!-- Filtros y búsqueda -->
 <div class="filtros-container">
-    <form method="GET" class="filtros-form">
+    <form method="GET" class="filtros-form" id="filtrosForm">
         <!-- Búsqueda -->
-        <div class="buscador-container" style="margin-bottom: 1rem;">
+        <div class="buscador-container" style="margin-bottom: 1rem; position: relative;">
             <i class="fas fa-search buscador-icon" style="left: 1.2rem;"></i>
-            <input type="text" name="search" class="buscador-input" style="padding-left: 2.8rem;" 
-                   placeholder="Buscar por nombre, código o descripción..." value="">
+            <input type="text" name="search" class="buscador-input" style="padding-left: 2.8rem; padding-right: 2.5rem;" 
+                   placeholder="Buscar por nombre, SKU, código o descripción..." 
+                   value="<?php echo h($search); ?>" id="searchInput" autocomplete="off">
+            <?php if (!empty($search)): ?>
+                <button type="button" class="clear-search" onclick="window.location.href='<?php echo url('dashboard/productos/index.php'); ?>'">
+                    <i class="fas fa-times"></i>
+                </button>
+            <?php endif; ?>
         </div>
         
         <!-- Filtros -->
         <div class="filtros-grid" style="grid-template-columns: repeat(5, 1fr);">
-            <select name="categoria" class="filtro-select">
+            <select name="categoria" class="filtro-select" onchange="this.form.submit()">
                 <option value="">📂 Todas las categorías</option>
-                <option value="1">Herramientas</option>
-                <option value="2">Materiales</option>
-                <option value="3">Pinturas</option>
-                <option value="4">Electricidad</option>
+                <?php while ($cat = $categorias->fetch_assoc()): ?>
+                    <option value="<?php echo $cat['id']; ?>" <?php echo $categoria_id == $cat['id'] ? 'selected' : ''; ?>>
+                        <?php echo h($cat['nombre']); ?>
+                    </option>
+                <?php endwhile; ?>
             </select>
             
-            <select name="marca" class="filtro-select">
+            <select name="marca" class="filtro-select" onchange="this.form.submit()">
                 <option value="">🏷️ Todas las marcas</option>
-                <option value="1">Truper</option>
-                <option value="2">Pretul</option>
-                <option value="3">Volteck</option>
-                <option value="4">Stanley</option>
+                <?php while ($marca = $marcas->fetch_assoc()): ?>
+                    <option value="<?php echo $marca['id']; ?>" <?php echo $marca_id == $marca['id'] ? 'selected' : ''; ?>>
+                        <?php echo h($marca['nombre']); ?>
+                    </option>
+                <?php endwhile; ?>
             </select>
             
-            <select name="stock" class="filtro-select">
+            <select name="stock" class="filtro-select" onchange="this.form.submit()">
                 <option value="">📦 Todos los stocks</option>
-                <option value="bajo">⚠️ Stock bajo</option>
-                <option value="agotado">❌ Agotados</option>
+                <option value="bajo" <?php echo $stock_filtro == 'bajo' ? 'selected' : ''; ?>>⚠️ Stock bajo</option>
+                <option value="agotado" <?php echo $stock_filtro == 'agotado' ? 'selected' : ''; ?>>❌ Agotados</option>
             </select>
             
             <button type="submit" class="btn-filtro btn-primary">
@@ -59,26 +168,43 @@ include '../header.php';
                 Filtrar
             </button>
             
-            <a href="/dashboard/productos/index.php" class="btn-filtro btn-secondary" style="text-decoration: none; text-align: center;">
+            <a href="<?php echo url('dashboard/productos/index.php'); ?>" class="btn-filtro btn-secondary" style="text-decoration: none; text-align: center;">
                 <i class="fas fa-times"></i>
                 Limpiar
             </a>
         </div>
         
-        <!-- Resultados de búsqueda -->
-        <div class="resultados-info" style="margin-top: 1rem;">
-            <i class="fas fa-info-circle"></i>
-            Se encontraron <span class="highlight">24</span> productos
-            con los filtros aplicados
+        <!-- Resultados de búsqueda con indicador de tiempo -->
+        <div class="resultados-info" style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <i class="fas fa-info-circle"></i>
+                Se encontraron <span class="highlight"><?php echo number_format($total_productos); ?></span> productos
+                <?php if (!empty($search)): ?>
+                    para "<strong><?php echo h($search); ?></strong>"
+                <?php endif; ?>
+                <?php if ($categoria_id > 0 || $marca_id > 0 || !empty($stock_filtro)): ?>
+                    con los filtros aplicados
+                <?php endif; ?>
+                <span class="tiempo-carga" style="font-size: 0.8rem; color: var(--gray-400); margin-left: 1rem;">
+                    ⚡ <?php echo $tiempo_carga; ?> ms
+                </span>
+            </div>
+            
+            <?php if ($total_productos > 0): ?>
+                <div class="resultados-pagina">
+                    Mostrando <?php echo number_format($offset + 1); ?> - <?php echo number_format(min($offset + $limite, $total_productos)); ?> 
+                    de <?php echo number_format($total_productos); ?>
+                </div>
+            <?php endif; ?>
         </div>
     </form>
 </div>
 
-<!-- Tabla de productos -->
-<div class="tabla-container">
+<!-- Tabla de productos con scroll para 500 filas -->
+<div class="tabla-container" style="max-height: 70vh; overflow-y: auto;">
     <div class="tabla-responsive">
-        <table class="tabla-productos">
-            <thead>
+        <table class="tabla-productos" style="width: 100%;">
+            <thead style="position: sticky; top: 0; background: var(--gray-100); z-index: 10;">
                 <tr>
                     <th>Código</th>
                     <th>Producto</th>
@@ -91,259 +217,178 @@ include '../header.php';
                 </tr>
             </thead>
             <tbody>
-                <!-- Producto 1 -->
-                <tr class="fila-producto">
-                    <td class="col-codigo">
-                        <div class="codigo-wrapper">
-                            <span class="codigo-sku">SKU: TRP-001-24</span>
-                            <span class="codigo-barras">750123456789</span>
-                        </div>
-                    </td>
-                    <td class="col-producto">
-                        <div class="producto-info">
-                            <span class="producto-nombre">Martillo de Uña 16oz con Mango de Madera</span>
-                            <span class="producto-descripcion">Cabeza forjada, mango de madera de fresno</span>
-                        </div>
-                    </td>
-                    <td class="col-categoria">
-                        <span class="categoria-nombre">Herramientas</span>
-                    </td>
-                    <td class="col-marca">
-                        <span class="marca-nombre">Truper</span>
-                    </td>
-                    <td class="col-precio">
-                        <span class="precio-valor">$185.00</span>
-                    </td>
-                    <td class="col-stock">
-                        <div class="stock-wrapper">
-                            <div class="stock-badge stock-ok">
-                                <span class="stock-actual">45</span>
-                                <span class="stock-separador">/</span>
-                                <span class="stock-minimo">10</span>
+                <?php if ($productos->num_rows > 0): ?>
+                    <?php while ($p = $productos->fetch_assoc()): ?>
+                    <tr class="fila-producto">
+                        <td class="col-codigo">
+                            <div class="codigo-wrapper">
+                                <span class="codigo-sku">SKU: <?php echo h($p['sku']); ?></span>
+                                <span class="codigo-barras"><?php echo $p['codigo_barras'] ?: '—'; ?></span>
                             </div>
-                        </div>
-                    </td>
-                    <td class="col-estado">
-                        <span class="estado-badge activo">Activo</span>
-                    </td>
-                    <td class="col-acciones">
-                        <div class="acciones-wrapper">
-                            <a href="#" class="accion-icon" title="Ver detalles">
-                                <i class="fas fa-eye"></i>
-                            </a>
-                            <a href="#" class="accion-icon" title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <a href="#" class="accion-icon" title="Ajustar stock">
-                                <i class="fas fa-cubes"></i>
-                            </a>
-                        </div>
-                    </td>
-                </tr>
-                
-                <!-- Producto 2 -->
-                <tr class="fila-producto">
-                    <td class="col-codigo">
-                        <div class="codigo-wrapper">
-                            <span class="codigo-sku">SKU: VAR-3/8-12</span>
-                            <span class="codigo-barras">750123456788</span>
-                        </div>
-                    </td>
-                    <td class="col-producto">
-                        <div class="producto-info">
-                            <span class="producto-nombre">Varilla Corrugada 3/8" x 12m</span>
-                            <span class="producto-descripcion">Grado 60, para construcción</span>
-                        </div>
-                    </td>
-                    <td class="col-categoria">
-                        <span class="categoria-nombre">Materiales</span>
-                    </td>
-                    <td class="col-marca">
-                        <span class="marca-nombre">Deacero</span>
-                    </td>
-                    <td class="col-precio">
-                        <span class="precio-valor">$245.00</span>
-                    </td>
-                    <td class="col-stock">
-                        <div class="stock-wrapper">
-                            <div class="stock-badge stock-bajo">
-                                <span class="stock-actual">3</span>
-                                <span class="stock-separador">/</span>
-                                <span class="stock-minimo">5</span>
+                        </td>
+                        <td class="col-producto">
+                            <div class="producto-info">
+                                <span class="producto-nombre"><?php echo h($p['nombre']); ?></span>
+                                <?php if (!empty($p['descripcion'])): ?>
+                                    <span class="producto-descripcion"><?php echo h(substr($p['descripcion'], 0, 60)) . '...'; ?></span>
+                                <?php endif; ?>
                             </div>
-                        </div>
-                    </td>
-                    <td class="col-estado">
-                        <span class="estado-badge activo">Activo</span>
-                    </td>
-                    <td class="col-acciones">
-                        <div class="acciones-wrapper">
-                            <a href="#" class="accion-icon" title="Ver detalles">
-                                <i class="fas fa-eye"></i>
-                            </a>
-                            <a href="#" class="accion-icon" title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <a href="#" class="accion-icon" title="Ajustar stock">
-                                <i class="fas fa-cubes"></i>
-                            </a>
-                        </div>
-                    </td>
-                </tr>
-                
-                <!-- Producto 3 -->
-                <tr class="fila-producto">
-                    <td class="col-codigo">
-                        <div class="codigo-wrapper">
-                            <span class="codigo-sku">SKU: CEM-GRIS-50</span>
-                            <span class="codigo-barras">750123456787</span>
-                        </div>
-                    </td>
-                    <td class="col-producto">
-                        <div class="producto-info">
-                            <span class="producto-nombre">Cemento Portland Gris 50kg</span>
-                            <span class="producto-descripcion">Cruz Azul, resistencia 30</span>
-                        </div>
-                    </td>
-                    <td class="col-categoria">
-                        <span class="categoria-nombre">Materiales</span>
-                    </td>
-                    <td class="col-marca">
-                        <span class="marca-nombre">Cruz Azul</span>
-                    </td>
-                    <td class="col-precio">
-                        <span class="precio-valor">$185.00</span>
-                    </td>
-                    <td class="col-stock">
-                        <div class="stock-wrapper">
-                            <div class="stock-badge stock-cero">
-                                <span class="stock-actual">0</span>
-                                <span class="stock-separador">/</span>
-                                <span class="stock-minimo">10</span>
+                        </td>
+                        <td class="col-categoria">
+                            <span class="categoria-nombre"><?php echo $p['categoria_nombre'] ?: '—'; ?></span>
+                        </td>
+                        <td class="col-marca">
+                            <span class="marca-nombre"><?php echo $p['marca_nombre'] ?: '—'; ?></span>
+                        </td>
+                        <td class="col-precio">
+                            <span class="precio-valor"><?php echo formatoPrecio($p['precio_venta']); ?></span>
+                        </td>
+                        <td class="col-stock">
+                            <div class="stock-wrapper">
+                                <?php
+                                $stock_class = 'stock-ok';
+                                if ($p['stock_actual'] <= 0) {
+                                    $stock_class = 'stock-cero';
+                                } elseif ($p['stock_actual'] <= $p['stock_minimo']) {
+                                    $stock_class = 'stock-bajo';
+                                }
+                                ?>
+                                <div class="stock-badge <?php echo $stock_class; ?>">
+                                    <span class="stock-actual"><?php echo $p['stock_actual']; ?></span>
+                                    <span class="stock-separador">/</span>
+                                    <span class="stock-minimo"><?php echo $p['stock_minimo']; ?></span>
+                                </div>
                             </div>
-                        </div>
-                    </td>
-                    <td class="col-estado">
-                        <span class="estado-badge activo">Activo</span>
-                    </td>
-                    <td class="col-acciones">
-                        <div class="acciones-wrapper">
-                            <a href="#" class="accion-icon" title="Ver detalles">
-                                <i class="fas fa-eye"></i>
-                            </a>
-                            <a href="#" class="accion-icon" title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <a href="#" class="accion-icon" title="Ajustar stock">
-                                <i class="fas fa-cubes"></i>
-                            </a>
-                        </div>
-                    </td>
-                </tr>
-                
-                <!-- Producto 4 -->
-                <tr class="fila-producto">
-                    <td class="col-codigo">
-                        <div class="codigo-wrapper">
-                            <span class="codigo-sku">SKU: PIN-BLA-20L</span>
-                            <span class="codigo-barras">750123456786</span>
-                        </div>
-                    </td>
-                    <td class="col-producto">
-                        <div class="producto-info">
-                            <span class="producto-nombre">Pintura Blanca 20L</span>
-                            <span class="producto-descripcion">Vinílica, mate, uso interior/exterior</span>
-                        </div>
-                    </td>
-                    <td class="col-categoria">
-                        <span class="categoria-nombre">Pinturas</span>
-                    </td>
-                    <td class="col-marca">
-                        <span class="marca-nombre">Comex</span>
-                    </td>
-                    <td class="col-precio">
-                        <span class="precio-valor">$850.00</span>
-                    </td>
-                    <td class="col-stock">
-                        <div class="stock-wrapper">
-                            <div class="stock-badge stock-ok">
-                                <span class="stock-actual">12</span>
-                                <span class="stock-separador">/</span>
-                                <span class="stock-minimo">8</span>
+                        </td>
+                        <td class="col-estado">
+                            <span class="estado-badge <?php echo $p['activo'] ? 'activo' : 'inactivo'; ?>">
+                                <?php echo $p['activo'] ? 'Activo' : 'Inactivo'; ?>
+                            </span>
+                        </td>
+                        <td class="col-acciones">
+                            <div class="acciones-wrapper">
+                                <a href="<?php echo url('dashboard/productos/ver.php?id=' . $p['id']); ?>" class="accion-icon" title="Ver detalles">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="<?php echo url('dashboard/productos/editar.php?id=' . $p['id']); ?>" class="accion-icon" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="<?php echo url('dashboard/productos/ajustar_stock.php?id=' . $p['id']); ?>" class="accion-icon" title="Ajustar stock">
+                                    <i class="fas fa-cubes"></i>
+                                </a>
                             </div>
-                        </div>
-                    </td>
-                    <td class="col-estado">
-                        <span class="estado-badge activo">Activo</span>
-                    </td>
-                    <td class="col-acciones">
-                        <div class="acciones-wrapper">
-                            <a href="#" class="accion-icon" title="Ver detalles">
-                                <i class="fas fa-eye"></i>
+                        </td>
+                    </tr>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="8" class="empty-state-row">
+                            <div class="empty-state-icon">
+                                <i class="fas fa-box-open"></i>
+                            </div>
+                            <h3>No se encontraron productos</h3>
+                            <p>Intenta con otros filtros o crea un nuevo producto</p>
+                            <a href="<?php echo url('dashboard/productos/nuevo.php'); ?>" class="btn-primary" style="margin-top: 1rem;">
+                                <i class="fas fa-plus"></i>
+                                Nuevo Producto
                             </a>
-                            <a href="#" class="accion-icon" title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <a href="#" class="accion-icon" title="Ajustar stock">
-                                <i class="fas fa-cubes"></i>
-                            </a>
-                        </div>
-                    </td>
-                </tr>
+                        </td>
+                    </tr>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
-    
-    <!-- Paginación -->
-    <div class="paginacion-container">
-        <p class="paginacion-info">
-            Mostrando <span class="font-semibold">1</span> - <span class="font-semibold">8</span> 
-            de <span class="font-semibold">24</span> productos
-        </p>
-        
-        <div class="paginacion-controles">
-            <a href="#" class="btn-paginacion prev">
+</div>
+
+<!-- Paginación (fuera del scroll) -->
+<?php if ($total_paginas > 1): ?>
+<div class="paginacion-container" style="margin-top: 1rem;">
+    <div class="paginacion-controles" style="justify-content: center;">
+        <?php if ($pagina > 1): ?>
+            <a href="?<?php echo http_build_query(array_merge($_GET, ['pagina' => $pagina - 1])); ?>" class="btn-paginacion prev">
                 <i class="fas fa-chevron-left"></i>
                 Anterior
             </a>
+        <?php endif; ?>
+        
+        <div class="paginacion-numeros">
+            <?php
+            $inicio = max(1, $pagina - 2);
+            $fin = min($total_paginas, $pagina + 2);
             
-            <div class="paginacion-numeros">
-                <a href="#" class="pagina-numero active">1</a>
-                <a href="#" class="pagina-numero">2</a>
-                <a href="#" class="pagina-numero">3</a>
+            for ($i = $inicio; $i <= $fin; $i++):
+            ?>
+                <a href="?<?php echo http_build_query(array_merge($_GET, ['pagina' => $i])); ?>" 
+                   class="pagina-numero <?php echo $i == $pagina ? 'active' : ''; ?>">
+                    <?php echo $i; ?>
+                </a>
+            <?php endfor; ?>
+            
+            <?php if ($fin < $total_paginas): ?>
                 <span class="pagina-separador">...</span>
-                <a href="#" class="pagina-numero">5</a>
-            </div>
-            
-            <a href="#" class="btn-paginacion next">
+                <a href="?<?php echo http_build_query(array_merge($_GET, ['pagina' => $total_paginas])); ?>" class="pagina-numero">
+                    <?php echo $total_paginas; ?>
+                </a>
+            <?php endif; ?>
+        </div>
+        
+        <?php if ($pagina < $total_paginas): ?>
+            <a href="?<?php echo http_build_query(array_merge($_GET, ['pagina' => $pagina + 1])); ?>" class="btn-paginacion next">
                 Siguiente
                 <i class="fas fa-chevron-right"></i>
             </a>
-        </div>
+        <?php endif; ?>
     </div>
 </div>
+<?php endif; ?>
 
 <style>
-/* Animaciones para las filas */
+/* Header fijo en la tabla */
+.tabla-productos thead th {
+    position: sticky;
+    top: 0;
+    background: var(--gray-100);
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Scroll personalizado para la tabla */
+.tabla-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.tabla-container::-webkit-scrollbar-track {
+    background: var(--gray-100);
+}
+
+.tabla-container::-webkit-scrollbar-thumb {
+    background: var(--gray-400);
+    border-radius: 4px;
+}
+
+.tabla-container::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-500);
+}
+
+/* Animación optimizada para muchas filas */
+.fila-producto {
+    animation: fadeInRow 0.2s ease-out forwards;
+}
+
 @keyframes fadeInRow {
     from {
-        opacity: 0;
-        transform: translateY(10px);
+        opacity: 0.5;
     }
     to {
         opacity: 1;
-        transform: translateY(0);
     }
 }
 
-.fila-producto {
-    animation: fadeInRow 0.3s ease-out forwards;
+/* Para 500 filas, procesar en lotes */
+.fila-producto:nth-child(n) { 
+    animation-duration: 0.1s; 
 }
-
-.fila-producto:nth-child(1) { animation-delay: 0.05s; }
-.fila-producto:nth-child(2) { animation-delay: 0.1s; }
-.fila-producto:nth-child(3) { animation-delay: 0.15s; }
-.fila-producto:nth-child(4) { animation-delay: 0.2s; }
 </style>
 
 <?php include '../footer.php'; ?>

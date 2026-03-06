@@ -1,63 +1,98 @@
 <?php
-include '../header.php';
+require_once '../../config.php';
+requiereAuth();
 
-// Simulación de producto encontrado por escáner
-$producto_encontrado = null;
+$conn = getDB();
+
 $error = '';
 $success = '';
+$producto_encontrado = null;
+$resultados_busqueda = [];
 
-// Simular búsqueda por código (ejemplo)
-if (isset($_GET['codigo'])) {
-    $codigo = $_GET['codigo'];
+// Buscar por código de barras (viene del escáner o búsqueda manual)
+if (isset($_GET['codigo']) || isset($_GET['buscar'])) {
+    $termino = isset($_GET['codigo']) ? trim($_GET['codigo']) : trim($_GET['buscar']);
     
-    // Simular búsqueda en base de datos
-    $productos_db = [
-        '750123456789' => [
-            'id' => 1,
-            'codigo_barras' => '750123456789',
-            'nombre' => 'Martillo de Uña 16oz',
-            'stock_actual' => 15,
-            'stock_minimo' => 5,
-            'imagen' => 'https://via.placeholder.com/200?text=Martillo'
-        ],
-        '750123456788' => [
-            'id' => 2,
-            'codigo_barras' => '750123456788',
-            'nombre' => 'Taladro Percutor 500W',
-            'stock_actual' => 8,
-            'stock_minimo' => 3,
-            'imagen' => 'https://via.placeholder.com/200?text=Taladro'
-        ],
-        '750123456787' => [
-            'id' => 3,
-            'codigo_barras' => '750123456787',
-            'nombre' => 'Caja de Tornillos 1/2"',
-            'stock_actual' => 25,
-            'stock_minimo' => 10,
-            'imagen' => 'https://via.placeholder.com/200?text=Tornillos'
-        ]
-    ];
+    // Buscar por código de barras exacto
+    $stmt = $conn->prepare("SELECT * FROM productos WHERE codigo_barras = ? AND activo = 1");
+    $stmt->bind_param("s", $termino);
+    $stmt->execute();
+    $result = $stmt->get_result();
     
-    if (isset($productos_db[$codigo])) {
-        $producto_encontrado = $productos_db[$codigo];
+    if ($result->num_rows > 0) {
+        $producto_encontrado = $result->fetch_assoc();
     } else {
-        $error = "Producto no encontrado con código: $codigo";
+        // Si no se encuentra por código, buscar por nombre (para búsqueda manual)
+        $termino_like = "%$termino%";
+        $stmt = $conn->prepare("
+            SELECT id, sku, codigo_barras, nombre, stock_actual, stock_minimo, imagen_url 
+            FROM productos 
+            WHERE (nombre LIKE ? OR sku LIKE ?) AND activo = 1 
+            LIMIT 10
+        ");
+        $stmt->bind_param("ss", $termino_like, $termino_like);
+        $stmt->execute();
+        $resultados_busqueda = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        
+        if (empty($resultados_busqueda)) {
+            $error = "No se encontraron productos con: $termino";
+        }
     }
 }
 
-// Simular procesamiento de entrada
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_producto'])) {
-    $id_producto = $_POST['id_producto'];
-    $cantidad = (int)$_POST['cantidad'];
-    $motivo = $_POST['motivo'];
+// Procesar entrada
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $id_producto = (int)($_POST['id_producto'] ?? 0);
+    $cantidad = (int)($_POST['cantidad'] ?? 0);
+    $motivo = trim($_POST['motivo'] ?? 'Entrada por escáner');
     
-    if ($cantidad > 0) {
-        $success = "Entrada registrada: +$cantidad unidades";
-        $producto_encontrado = null; // Limpiar para siguiente entrada
-    } else {
+    if ($cantidad <= 0) {
         $error = 'La cantidad debe ser mayor a cero';
+    } else {
+        // Obtener producto
+        $stmt = $conn->prepare("SELECT * FROM productos WHERE id = ?");
+        $stmt->bind_param("i", $id_producto);
+        $stmt->execute();
+        $producto = $stmt->get_result()->fetch_assoc();
+        
+        if ($producto) {
+            $stock_anterior = $producto['stock_actual'];
+            $stock_nuevo = $stock_anterior + $cantidad;
+            
+            // Iniciar transacción
+            $conn->begin_transaction();
+            
+            try {
+                // Actualizar stock
+                $update = $conn->prepare("UPDATE productos SET stock_actual = ? WHERE id = ?");
+                $update->bind_param("ii", $stock_nuevo, $id_producto);
+                $update->execute();
+                
+                // Registrar movimiento
+                $movimiento = $conn->prepare("
+                    INSERT INTO movimientos_inventario 
+                    (id_producto, tipo, cantidad, stock_anterior, stock_nuevo, motivo, id_usuario) 
+                    VALUES (?, 'entrada', ?, ?, ?, ?, ?)
+                ");
+                $movimiento->bind_param("iiiisi", $id_producto, $cantidad, $stock_anterior, $stock_nuevo, $motivo, $_SESSION['user_id']);
+                $movimiento->execute();
+                
+                $conn->commit();
+                $success = "Entrada registrada: +$cantidad unidades a " . $producto['nombre'];
+                
+                // Limpiar para siguiente entrada
+                $producto_encontrado = null;
+                $resultados_busqueda = [];
+                
+            } catch (Exception $e) {
+                $conn->rollback();
+                $error = 'Error al registrar entrada: ' . $e->getMessage();
+            }
+        }
     }
 }
+
+include '../header.php';
 ?>
 
 <!-- Header de la página -->
@@ -71,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_producto'])) {
     </div>
     
     <div class="pv-header-right">
-        <a href="/dashboard/productos/index.php" class="btn-header" style="text-decoration: none;">
+        <a href="<?php echo url('dashboard/productos/index.php'); ?>" class="btn-header" style="text-decoration: none;">
             <i class="fas fa-arrow-left"></i>
             Volver a Productos
         </a>
@@ -87,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_producto'])) {
         <div class="instrucciones-contenido">
             <h4>Modo de uso:</h4>
             <ul>
-                <li>1. Escanea el código de barras con la pistola</li>
+                <li>1. Escanea el código de barras o busca por nombre</li>
                 <li>2. El producto se cargará automáticamente</li>
                 <li>3. Ingresa la cantidad y motivo</li>
                 <li>4. Confirma la entrada</li>
@@ -95,20 +130,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_producto'])) {
         </div>
     </div>
     
-    <!-- Buscador por escáner -->
+    <!-- Buscador por escáner y nombre -->
     <div class="escaner-box">
         <div class="escaner-icono">
             <i class="fas fa-barcode"></i>
         </div>
-        <h2>Escanear Producto</h2>
+        <h2>Buscar Producto</h2>
         
         <form method="GET" class="escaner-form" autocomplete="off">
             <div class="escaner-input-group">
                 <div class="escaner-input-wrapper">
-                    <i class="fas fa-camera"></i>
-                    <input type="text" name="codigo" id="codigoInput" 
-                           value="<?php echo htmlspecialchars($_GET['codigo'] ?? ''); ?>"
-                           placeholder="Código de barras" class="escaner-input" autofocus>
+                    <i class="fas fa-search"></i>
+                    <input type="text" name="buscar" id="buscarInput" 
+                           value="<?php echo isset($_GET['buscar']) ? h($_GET['buscar']) : ''; ?>"
+                           placeholder="Código de barras o nombre del producto" 
+                           class="escaner-input" autofocus>
                 </div>
                 <button type="submit" class="btn-escanear">
                     <i class="fas fa-search"></i>
@@ -117,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_producto'])) {
             </div>
             <p class="escaner-hint">
                 <i class="fas fa-info-circle"></i>
-                Enfoca la pistola al código de barras y escanea
+                Puedes escanear el código de barras o escribir el nombre del producto
             </p>
         </form>
     </div>
@@ -126,7 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_producto'])) {
     <?php if ($error): ?>
         <div class="alerta error">
             <i class="fas fa-exclamation-circle"></i>
-            <p><?php echo $error; ?></p>
+            <p><?php echo h($error); ?></p>
         </div>
     <?php endif; ?>
     
@@ -137,7 +173,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_producto'])) {
         </div>
     <?php endif; ?>
     
-    <!-- Formulario de entrada si hay producto -->
+    <!-- Resultados de búsqueda múltiples -->
+    <?php if (!empty($resultados_busqueda) && !$producto_encontrado): ?>
+        <div class="resultados-multiples">
+            <h3>Selecciona un producto:</h3>
+            <div class="resultados-grid">
+                <?php foreach ($resultados_busqueda as $prod): ?>
+                <a href="?codigo=<?php echo urlencode($prod['codigo_barras'] ?: $prod['sku']); ?>" class="resultado-item-card">
+                    <div class="resultado-imagen">
+                        <?php if (!empty($prod['imagen_url'])): ?>
+                            <img src="<?php echo BASE_URL . '/' . $prod['imagen_url']; ?>" 
+                                 alt="<?php echo h($prod['nombre']); ?>"
+                                 onerror="this.onerror=null; this.src='<?php echo asset('images/no-image.png'); ?>';">
+                        <?php else: ?>
+                            <img src="<?php echo asset('images/no-image.png'); ?>" alt="Sin imagen">
+                        <?php endif; ?>
+                    </div>
+                    <div class="resultado-info">
+                        <strong><?php echo h($prod['nombre']); ?></strong>
+                        <small>SKU: <?php echo h($prod['sku']); ?></small>
+                        <?php if ($prod['codigo_barras']): ?>
+                            <small>Código: <?php echo $prod['codigo_barras']; ?></small>
+                        <?php endif; ?>
+                        <span class="resultado-stock">Stock: <?php echo $prod['stock_actual']; ?></span>
+                    </div>
+                </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    <?php endif; ?>
+    
+    <!-- Formulario de entrada si hay producto encontrado -->
     <?php if ($producto_encontrado): ?>
         <div class="producto-encontrado-card">
             <div class="producto-encontrado-header">
@@ -146,22 +212,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_producto'])) {
             </div>
             
             <div class="producto-encontrado-body">
-                <!-- Imagen del producto -->
+                <!-- Imagen del producto (estilo Facebook) -->
                 <div class="producto-imagen">
-                    <img src="<?php echo $producto_encontrado['imagen']; ?>" 
-                         alt="<?php echo $producto_encontrado['nombre']; ?>">
+                    <?php if (!empty($producto_encontrado['imagen_url'])): ?>
+                        <img src="<?php echo BASE_URL . '/' . $producto_encontrado['imagen_url']; ?>" 
+                             alt="<?php echo h($producto_encontrado['nombre']); ?>"
+                             onerror="this.onerror=null; this.src='<?php echo asset('images/no-image.png'); ?>';">
+                    <?php else: ?>
+                        <img src="<?php echo asset('images/no-image.png'); ?>" alt="Sin imagen">
+                    <?php endif; ?>
                 </div>
                 
                 <!-- Información del producto -->
                 <div class="producto-info-detalle">
                     <div class="info-item">
                         <span class="info-label">Código de barras</span>
-                        <span class="info-valor codigo"><?php echo $producto_encontrado['codigo_barras']; ?></span>
+                        <span class="info-valor codigo"><?php echo $producto_encontrado['codigo_barras'] ?: '—'; ?></span>
+                    </div>
+                    
+                    <div class="info-item">
+                        <span class="info-label">SKU</span>
+                        <span class="info-valor"><?php echo h($producto_encontrado['sku']); ?></span>
                     </div>
                     
                     <div class="info-item">
                         <span class="info-label">Nombre del producto</span>
-                        <span class="info-valor nombre"><?php echo $producto_encontrado['nombre']; ?></span>
+                        <span class="info-valor nombre"><?php echo h($producto_encontrado['nombre']); ?></span>
                     </div>
                     
                     <div class="stock-info-grid">
@@ -215,9 +291,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_producto'])) {
                         <i class="fas fa-save"></i>
                         Registrar Entrada
                     </button>
-                    <a href="entrada_rapida.php" class="btn-escanear-otro">
+                    <a href="<?php echo url('dashboard/inventario/entrada_rapida.php'); ?>" class="btn-escanear-otro">
                         <i class="fas fa-barcode"></i>
-                        Escanear otro
+                        Buscar otro
                     </a>
                 </div>
             </form>
@@ -228,7 +304,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_producto'])) {
     <div class="accesos-rapidos">
         <h3>Accesos Rápidos</h3>
         <div class="accesos-grid">
-            <a href="/dashboard/productos/index.php" class="acceso-card">
+            <a href="<?php echo url('dashboard/productos/index.php'); ?>" class="acceso-card">
                 <div class="acceso-icono" style="background: var(--primary-alpha);">
                     <i class="fas fa-list" style="color: var(--primary);"></i>
                 </div>
@@ -238,7 +314,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_producto'])) {
                 </div>
             </a>
             
-            <a href="/dashboard/productos/nuevo.php" class="acceso-card">
+            <a href="<?php echo url('dashboard/productos/nuevo.php'); ?>" class="acceso-card">
                 <div class="acceso-icono" style="background: var(--success-light);">
                     <i class="fas fa-plus" style="color: var(--success);"></i>
                 </div>
@@ -248,7 +324,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_producto'])) {
                 </div>
             </a>
             
-            <a href="/dashboard/ventas/index.php" class="acceso-card">
+            <a href="<?php echo url('dashboard/ventas/index.php'); ?>" class="acceso-card">
                 <div class="acceso-icono" style="background: var(--secondary-alpha);">
                     <i class="fas fa-shopping-cart" style="color: var(--secondary);"></i>
                 </div>
@@ -278,7 +354,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_producto'])) {
     animation: fadeInUp 0.3s ease-out;
 }
 
-/* Efecto de pulso para el input al escanear */
+/* Resultados múltiples */
+.resultados-multiples {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--shadow-md);
+}
+
+.resultados-multiples h3 {
+    margin-bottom: 1rem;
+    color: var(--gray-700);
+}
+
+.resultados-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.resultado-item-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s;
+}
+
+.resultado-item-card:hover {
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.resultado-imagen {
+    width: 60px;
+    height: 60px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    flex-shrink: 0;
+    background: white;
+}
+
+.resultado-imagen img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.resultado-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.resultado-info strong {
+    font-size: 0.9rem;
+    color: var(--gray-800);
+}
+
+.resultado-info small {
+    font-size: 0.7rem;
+    color: var(--gray-500);
+}
+
+.resultado-stock {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--primary);
+    margin-top: 0.25rem;
+}
+
+/* Efecto de pulso para el input */
 @keyframes pulse {
     0%, 100% { box-shadow: 0 0 0 0 var(--primary-alpha); }
     50% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
@@ -287,12 +442,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_producto'])) {
 .escaner-input:focus {
     animation: pulse 1s infinite;
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .resultados-grid {
+        grid-template-columns: 1fr;
+    }
+}
 </style>
 
 <script>
-// Auto-enfocar el campo de escaneo
+// Auto-enfocar el campo de búsqueda
 document.addEventListener('DOMContentLoaded', function() {
-    const input = document.getElementById('codigoInput');
+    const input = document.getElementById('buscarInput');
     if (input) {
         input.focus();
         
@@ -303,8 +465,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Efecto visual al escanear
-document.getElementById('codigoInput')?.addEventListener('keypress', function(e) {
+// Efecto visual al buscar
+document.getElementById('buscarInput')?.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
         this.classList.add('animate-pulse');
         setTimeout(() => this.classList.remove('animate-pulse'), 300);

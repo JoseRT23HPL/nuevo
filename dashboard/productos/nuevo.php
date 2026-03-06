@@ -1,4 +1,157 @@
 <?php
+require_once __DIR__ . '/../../config.php';
+requiereAuth(); // Solo usuarios autenticados pueden acceder
+
+// Obtener categorías y marcas de la base de datos para los selects
+$conn = getDB();
+
+// Categorías activas
+$categorias = [];
+$result = $conn->query("SELECT id, nombre FROM categorias WHERE activo = 1 ORDER BY nombre");
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
+        $categorias[] = $row;
+    }
+}
+
+// Marcas activas
+$marcas = [];
+$result = $conn->query("SELECT id, nombre FROM marcas WHERE activo = 1 ORDER BY nombre");
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
+        $marcas[] = $row;
+    }
+}
+
+$error = '';
+$success = '';
+$producto_id = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Recoger datos del formulario
+    $sku = trim($_POST['sku'] ?? '');
+    $codigo_barras = trim($_POST['codigo_barras'] ?? '');
+    $nombre = trim($_POST['nombre'] ?? '');
+    $descripcion = trim($_POST['descripcion'] ?? '');
+    $id_categoria = !empty($_POST['categoria']) ? (int)$_POST['categoria'] : null;
+    $id_marca = !empty($_POST['marca']) ? (int)$_POST['marca'] : null;
+    $precio_compra = floatval($_POST['precio_compra'] ?? 0);
+    $precio_venta = floatval($_POST['precio_venta'] ?? 0);
+    $stock_inicial = (int)($_POST['stock_inicial'] ?? 0);
+    $stock_minimo = (int)($_POST['stock_minimo'] ?? 5);
+    
+    // Validaciones
+    if (empty($sku)) {
+        $error = 'El código SKU es obligatorio';
+    } elseif (empty($nombre)) {
+        $error = 'El nombre del producto es obligatorio';
+    } elseif ($precio_venta <= 0) {
+        $error = 'El precio de venta debe ser mayor a cero';
+    } elseif ($stock_inicial < 0) {
+        $error = 'El stock inicial no puede ser negativo';
+    } else {
+        // Verificar si el SKU ya existe
+        $stmt = $conn->prepare("SELECT id FROM productos WHERE sku = ?");
+        $stmt->bind_param("s", $sku);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows > 0) {
+            $error = 'Ya existe un producto con ese SKU';
+        } elseif (!empty($codigo_barras)) {
+            // Verificar si el código de barras ya existe (si se proporcionó)
+            $stmt = $conn->prepare("SELECT id FROM productos WHERE codigo_barras = ?");
+            $stmt->bind_param("s", $codigo_barras);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            if ($result->num_rows > 0) {
+                $error = 'Ya existe un producto con ese código de barras';
+            }
+        }
+        
+        if (empty($error)) {
+            // Manejar subida de imagen
+            $imagen_url = null;
+            
+            if (isset($_FILES['imagen']) && $_FILES['imagen']['error'] === UPLOAD_ERR_OK) {
+                $upload_dir = BASE_PATH . '/assets/images/productos/';
+                
+                // Crear directorio si no existe
+                if (!file_exists($upload_dir)) {
+                    mkdir($upload_dir, 0777, true);
+                }
+                
+                $file_extension = strtolower(pathinfo($_FILES['imagen']['name'], PATHINFO_EXTENSION));
+                $file_name = 'producto_' . time() . '_' . uniqid() . '.' . $file_extension;
+                $file_path = $upload_dir . $file_name;
+                
+                $allowed_types = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                
+                if (in_array($file_extension, $allowed_types)) {
+                    // Validar tamaño (2MB)
+                    if ($_FILES['imagen']['size'] <= 2 * 1024 * 1024) {
+                        if (move_uploaded_file($_FILES['imagen']['tmp_name'], $file_path)) {
+                            $imagen_url = 'assets/images/productos/' . $file_name;
+                        } else {
+                            $error = 'Error al subir la imagen';
+                        }
+                    } else {
+                        $error = 'La imagen no puede ser mayor a 2MB';
+                    }
+                } else {
+                    $error = 'Tipo de archivo no permitido. Use JPG, PNG, GIF o WEBP';
+                }
+            }
+            
+            if (empty($error)) {
+                // Insertar producto
+                $stmt = $conn->prepare("
+                    INSERT INTO productos (
+                        sku, codigo_barras, nombre, descripcion, 
+                        id_categoria, id_marca, precio_compra, precio_venta, 
+                        stock_actual, stock_minimo, imagen_url
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                
+                $stmt->bind_param(
+                    "ssssiiiddis",
+                    $sku,
+                    $codigo_barras,
+                    $nombre,
+                    $descripcion,
+                    $id_categoria,
+                    $id_marca,
+                    $precio_compra,
+                    $precio_venta,
+                    $stock_inicial,
+                    $stock_minimo,
+                    $imagen_url
+                );
+                
+                if ($stmt->execute()) {
+                    $producto_id = $conn->insert_id;
+                    
+                    // Registrar movimiento de inventario inicial si hay stock
+                    if ($stock_inicial > 0) {
+                        $movimiento = $conn->prepare("
+                            INSERT INTO movimientos_inventario 
+                            (id_producto, tipo, cantidad, stock_anterior, stock_nuevo, motivo, id_usuario) 
+                            VALUES (?, 'entrada', ?, 0, ?, 'Stock inicial', ?)
+                        ");
+                        $movimiento->bind_param("iiii", $producto_id, $stock_inicial, $stock_inicial, $_SESSION['user_id']);
+                        $movimiento->execute();
+                    }
+                    
+                    $success = 'Producto creado correctamente';
+                } else {
+                    $error = 'Error al crear el producto: ' . $conn->error;
+                }
+            }
+        }
+    }
+}
+
 include '../header.php';
 ?>
 
@@ -20,179 +173,217 @@ include '../header.php';
     </div>
 </div>
 
-<!-- Formulario de nuevo producto -->
-<div class="form-container">
-    <form method="POST" enctype="multipart/form-data" class="producto-form">
-        <div class="form-grid">
-            <!-- Columna izquierda - Información básica -->
-            <div class="form-col">
-                <h3 class="form-section-title">
-                    <i class="fas fa-info-circle"></i>
-                    Información básica
-                </h3>
-                
-                <div class="form-group">
-                    <label class="form-label">
-                        Código SKU <span class="required">*</span>
-                    </label>
-                    <input type="text" name="sku" class="form-input" 
-                           placeholder="Ej: TRP-001-24" required>
-                    <small class="form-hint">Identificador único del producto (Ej: MARCA-MODELO-TALLA)</small>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">
-                        Código de barras
-                    </label>
-                    <input type="text" name="codigo_barras" class="form-input" 
-                           placeholder="Ej: 7501234567890">
-                    <small class="form-hint">Opcional - Código de barras del producto</small>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">
-                        Nombre del producto <span class="required">*</span>
-                    </label>
-                    <input type="text" name="nombre" class="form-input" 
-                           placeholder="Ej: Martillo de Uña 16oz" required autofocus>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">
-                        Descripción
-                    </label>
-                    <textarea name="descripcion" class="form-textarea" rows="4" 
-                              placeholder="Descripción detallada del producto"></textarea>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group half">
+<!-- Mensajes de alerta -->
+<?php if ($error): ?>
+    <div class="alerta error">
+        <i class="fas fa-exclamation-circle"></i>
+        <p><?php echo h($error); ?></p>
+    </div>
+<?php endif; ?>
+
+<?php if ($success): ?>
+    <div class="alerta success">
+        <i class="fas fa-check-circle"></i>
+        <div class="alerta-content">
+            <p><?php echo $success; ?></p>
+            <div class="alerta-acciones">
+                <a href="/dashboard/productos/nuevo.php" class="btn-primary small">
+                    <i class="fas fa-plus"></i> Otro Producto
+                </a>
+                <a href="/dashboard/productos/index.php" class="btn-secondary small">
+                    <i class="fas fa-list"></i> Ver Listado
+                </a>
+                <?php if ($producto_id): ?>
+                    <a href="/dashboard/productos/ver.php?id=<?php echo $producto_id; ?>" class="btn-tertiary small">
+                        <i class="fas fa-eye"></i> Ver Producto
+                    </a>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
+<?php if (!$success): ?>
+    <!-- Formulario de nuevo producto -->
+    <div class="form-container">
+        <form method="POST" enctype="multipart/form-data" class="producto-form">
+            <div class="form-grid">
+                <!-- Columna izquierda - Información básica -->
+                <div class="form-col">
+                    <h3 class="form-section-title">
+                        <i class="fas fa-info-circle"></i>
+                        Información básica
+                    </h3>
+                    
+                    <div class="form-group">
                         <label class="form-label">
-                            Categoría
+                            Código SKU <span class="required">*</span>
                         </label>
-                        <select name="categoria" class="form-select">
-                            <option value="">Seleccionar categoría</option>
-                            <option value="1">Herramientas</option>
-                            <option value="2">Materiales</option>
-                            <option value="3">Pinturas</option>
-                            <option value="4">Electricidad</option>
-                            <option value="5">Plomería</option>
-                        </select>
+                        <input type="text" name="sku" class="form-input" 
+                               placeholder="Ej: TRP-001-24" 
+                               value="<?php echo h($_POST['sku'] ?? ''); ?>" required>
+                        <small class="form-hint">Identificador único del producto (Ej: MARCA-MODELO-TALLA)</small>
                     </div>
                     
-                    <div class="form-group half">
+                    <div class="form-group">
                         <label class="form-label">
-                            Marca
+                            Código de barras
                         </label>
-                        <select name="marca" class="form-select">
-                            <option value="">Seleccionar marca</option>
-                            <option value="1">Truper</option>
-                            <option value="2">Pretul</option>
-                            <option value="3">Volteck</option>
-                            <option value="4">Stanley</option>
-                            <option value="5">Comex</option>
-                        </select>
+                        <input type="text" name="codigo_barras" class="form-input" 
+                               placeholder="Ej: 7501234567890"
+                               value="<?php echo h($_POST['codigo_barras'] ?? ''); ?>">
+                        <small class="form-hint">Opcional - Código de barras del producto</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">
+                            Nombre del producto <span class="required">*</span>
+                        </label>
+                        <input type="text" name="nombre" class="form-input" 
+                               placeholder="Ej: Martillo de Uña 16oz" 
+                               value="<?php echo h($_POST['nombre'] ?? ''); ?>" required autofocus>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">
+                            Descripción
+                        </label>
+                        <textarea name="descripcion" class="form-textarea" rows="4" 
+                                  placeholder="Descripción detallada del producto"><?php echo h($_POST['descripcion'] ?? ''); ?></textarea>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label class="form-label">
+                                Categoría
+                            </label>
+                            <select name="categoria" class="form-select">
+                                <option value="">Seleccionar categoría</option>
+                                <?php foreach ($categorias as $cat): ?>
+                                    <option value="<?php echo $cat['id']; ?>" 
+                                        <?php echo (isset($_POST['categoria']) && $_POST['categoria'] == $cat['id']) ? 'selected' : ''; ?>>
+                                        <?php echo h($cat['nombre']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group half">
+                            <label class="form-label">
+                                Marca
+                            </label>
+                            <select name="marca" class="form-select">
+                                <option value="">Seleccionar marca</option>
+                                <?php foreach ($marcas as $m): ?>
+                                    <option value="<?php echo $m['id']; ?>"
+                                        <?php echo (isset($_POST['marca']) && $_POST['marca'] == $m['id']) ? 'selected' : ''; ?>>
+                                        <?php echo h($m['nombre']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Columna derecha - Precios, stock e IMAGEN -->
+                <div class="form-col">
+                    <h3 class="form-section-title">
+                        <i class="fas fa-dollar-sign"></i>
+                        Precios y stock
+                    </h3>
+                    
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label class="form-label">
+                                Precio de compra
+                            </label>
+                            <div class="input-prefix">
+                                <span>$</span>
+                                <input type="number" name="precio_compra" class="form-input" 
+                                       step="0.01" min="0" value="<?php echo $_POST['precio_compra'] ?? '0.00'; ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group half">
+                            <label class="form-label">
+                                Precio de venta <span class="required">*</span>
+                            </label>
+                            <div class="input-prefix">
+                                <span>$</span>
+                                <input type="number" name="precio_venta" class="form-input" 
+                                       step="0.01" min="0.01" required
+                                       value="<?php echo $_POST['precio_venta'] ?? ''; ?>">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label class="form-label">
+                                Stock inicial
+                            </label>
+                            <input type="number" name="stock_inicial" class="form-input" 
+                                   min="0" value="<?php echo $_POST['stock_inicial'] ?? '0'; ?>">
+                            <small class="form-hint">Cantidad que entra al inventario</small>
+                        </div>
+                        
+                        <div class="form-group half">
+                            <label class="form-label">
+                                Stock mínimo
+                            </label>
+                            <input type="number" name="stock_minimo" class="form-input" 
+                                   min="0" value="<?php echo $_POST['stock_minimo'] ?? '5'; ?>">
+                            <small class="form-hint">Alerta cuando el stock baje de aquí</small>
+                        </div>
+                    </div>
+                    
+                    <!-- SECCIÓN DE IMAGEN -->
+                    <h3 class="form-section-title" style="margin-top: 1.5rem;">
+                        <i class="fas fa-image"></i>
+                        Imagen del producto
+                    </h3>
+                    
+                    <div class="form-group">
+                        <div class="image-upload-area" id="imageUploadArea">
+                            <div class="image-preview" id="imagePreview">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p>Haz clic o arrastra una imagen aquí</p>
+                                <small>Formatos: JPG, PNG, GIF, WEBP (Max. 2MB)</small>
+                            </div>
+                            <input type="file" name="imagen" id="imagenInput" accept="image/*" class="hidden">
+                        </div>
+                    </div>
+                    
+                    <!-- Información adicional -->
+                    <div class="info-box" style="margin-top: 1rem;">
+                        <i class="fas fa-info-circle"></i>
+                        <div class="info-box-content">
+                            <h4>Información importante</h4>
+                            <p>
+                                El stock inicial se registrará automáticamente como un movimiento de entrada.
+                                El código SKU debe ser único en el sistema.
+                                La imagen es opcional y se mostrará en el catálogo.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Columna derecha - Precios, stock e IMAGEN -->
-            <div class="form-col">
-                <h3 class="form-section-title">
-                    <i class="fas fa-dollar-sign"></i>
-                    Precios y stock
-                </h3>
+            <!-- Botones de acción -->
+            <div class="form-actions">
+                <button type="submit" class="btn-submit">
+                    <i class="fas fa-save"></i>
+                    Guardar Producto
+                </button>
                 
-                <div class="form-row">
-                    <div class="form-group half">
-                        <label class="form-label">
-                            Precio de compra
-                        </label>
-                        <div class="input-prefix">
-                            <span>$</span>
-                            <input type="number" name="precio_compra" class="form-input" 
-                                   step="0.01" min="0" value="0.00">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group half">
-                        <label class="form-label">
-                            Precio de venta <span class="required">*</span>
-                        </label>
-                        <div class="input-prefix">
-                            <span>$</span>
-                            <input type="number" name="precio_venta" class="form-input" 
-                                   step="0.01" min="0.01" required>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group half">
-                        <label class="form-label">
-                            Stock inicial
-                        </label>
-                        <input type="number" name="stock_inicial" class="form-input" 
-                               min="0" value="0">
-                        <small class="form-hint">Cantidad que entra al inventario</small>
-                    </div>
-                    
-                    <div class="form-group half">
-                        <label class="form-label">
-                            Stock mínimo
-                        </label>
-                        <input type="number" name="stock_minimo" class="form-input" 
-                               min="0" value="5">
-                        <small class="form-hint">Alerta cuando el stock baje de aquí</small>
-                    </div>
-                </div>
-                
-                <!-- ===== NUEVA SECCIÓN DE IMAGEN ===== -->
-                <h3 class="form-section-title" style="margin-top: 1.5rem;">
-                    <i class="fas fa-image"></i>
-                    Imagen del producto
-                </h3>
-                
-                <div class="form-group">
-                    <div class="image-upload-area" id="imageUploadArea">
-                        <div class="image-preview" id="imagePreview">
-                            <i class="fas fa-cloud-upload-alt"></i>
-                            <p>Haz clic o arrastra una imagen aquí</p>
-                            <small>Formatos: JPG, PNG, GIF (Max. 2MB)</small>
-                        </div>
-                        <input type="file" name="imagen" id="imagenInput" accept="image/*" class="hidden">
-                    </div>
-                </div>
-                
-                <!-- Información adicional -->
-                <div class="info-box" style="margin-top: 1rem;">
-                    <i class="fas fa-info-circle"></i>
-                    <div class="info-box-content">
-                        <h4>Información importante</h4>
-                        <p>
-                            El stock inicial se registrará automáticamente como un movimiento de entrada.
-                            El código SKU debe ser único en el sistema.
-                            La imagen es opcional y se mostrará en el catálogo.
-                        </p>
-                    </div>
-                </div>
+                <a href="/dashboard/productos/index.php" class="btn-cancel">
+                    <i class="fas fa-times"></i>
+                    Cancelar
+                </a>
             </div>
-        </div>
-        
-        <!-- Botones de acción -->
-        <div class="form-actions">
-            <button type="submit" class="btn-submit">
-                <i class="fas fa-save"></i>
-                Guardar Producto
-            </button>
-            
-            <a href="/dashboard/productos/index.php" class="btn-cancel">
-                <i class="fas fa-times"></i>
-                Cancelar
-            </a>
-        </div>
-    </form>
-</div>
+        </form>
+    </div>
+<?php endif; ?>
 
 <style>
 /* Animación del formulario */
@@ -324,9 +515,9 @@ function procesarImagen(file) {
     }
     
     // Validar tipo
-    const tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+    const tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!tiposPermitidos.includes(file.type)) {
-        alert('❌ Solo se permiten archivos JPG, PNG o GIF');
+        alert('❌ Solo se permiten archivos JPG, PNG, GIF o WEBP');
         return;
     }
     
