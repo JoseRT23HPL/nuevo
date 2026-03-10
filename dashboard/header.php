@@ -1,11 +1,97 @@
 <?php
 require_once dirname(__DIR__) . '/config.php';
-requiereAuth(); // Esto protegerá todas las páginas que usen este header
-$usuario_actual = getCurrentUser();
-// Configuración ya está incluida desde el principio
-require_once dirname(__DIR__) . '/config.php';
-?>
+requiereAuth();
 
+// Obtener datos del usuario actual
+$usuario_actual = getCurrentUser();
+
+// Si no hay usuario (por alguna razón), usar valores por defecto
+if (!$usuario_actual) {
+    $usuario_actual = [
+        'id' => 0,
+        'nombre' => 'Usuario',
+        'email' => '',
+        'rol' => 'usuario'
+    ];
+}
+
+// Obtener iniciales para el avatar
+$nombre_completo = $usuario_actual['nombre'];
+$iniciales = strtoupper(substr($nombre_completo, 0, 1));
+if (strpos($nombre_completo, ' ') !== false) {
+    $partes = explode(' ', $nombre_completo);
+    $iniciales = strtoupper(substr($partes[0], 0, 1) . substr(end($partes), 0, 1));
+}
+
+// Contar notificaciones reales
+$conn = getDB();
+$notificaciones = [];
+$notificaciones_no_leidas = 0;
+
+if ($conn) {
+    // Productos con stock bajo
+    $result = $conn->query("SELECT COUNT(*) as total FROM productos WHERE stock_actual <= stock_minimo AND stock_actual > 0 AND activo = 1");
+    if ($result) {
+        $stock_bajo_count = $result->fetch_assoc()['total'];
+        $notificaciones_no_leidas += $stock_bajo_count;
+        
+        if ($stock_bajo_count > 0) {
+            $notificaciones[] = [
+                'tipo' => 'stock',
+                'icono' => 'fa-box',
+                'color' => 'bg-yellow-100',
+                'titulo' => 'Stock bajo',
+                'mensaje' => $stock_bajo_count . ' productos necesitan reabastecimiento',
+                'tiempo' => 'Ahora',
+                'enlace' => url('dashboard/inventario/stock_bajo.php')
+            ];
+        }
+    }
+    
+    // Productos agotados
+    $result = $conn->query("SELECT COUNT(*) as total FROM productos WHERE stock_actual = 0 AND activo = 1");
+    if ($result) {
+        $agotados_count = $result->fetch_assoc()['total'];
+        $notificaciones_no_leidas += $agotados_count;
+        
+        if ($agotados_count > 0) {
+            $notificaciones[] = [
+                'tipo' => 'agotado',
+                'icono' => 'fa-times-circle',
+                'color' => 'bg-red-100',
+                'titulo' => 'Productos agotados',
+                'mensaje' => $agotados_count . ' productos están sin stock',
+                'tiempo' => 'Ahora',
+                'enlace' => url('dashboard/inventario/stock_bajo.php?tipo=agotado')
+            ];
+        }
+    }
+    
+    // Ventas del día
+    $hoy = date('Y-m-d');
+    $result = $conn->query("SELECT COUNT(*) as total, COALESCE(SUM(total), 0) as total_ventas FROM ventas WHERE DATE(fecha_venta) = '$hoy'");
+    if ($result) {
+        $ventas_hoy = $result->fetch_assoc();
+        if ($ventas_hoy['total'] > 0) {
+            $notificaciones[] = [
+                'tipo' => 'venta',
+                'icono' => 'fa-shopping-cart',
+                'color' => 'bg-green-100',
+                'titulo' => 'Ventas del día',
+                'mensaje' => $ventas_hoy['total'] . ' ventas por $' . number_format($ventas_hoy['total_ventas'], 2),
+                'tiempo' => 'Hoy',
+                'enlace' => url('dashboard/ventas/historial.php?fecha_inicio=' . $hoy . '&fecha_fin=' . $hoy)
+            ];
+        }
+    }
+}
+
+// Incluir configuración de CSS
+include_once dirname(__DIR__) . '/assets/css/pages-config.php';
+$version = time();
+$current_uri = $_SERVER['REQUEST_URI'];
+$page_css = getPageCss($current_uri, $version);
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -20,7 +106,7 @@ require_once dirname(__DIR__) . '/config.php';
     <link rel="stylesheet" href="<?php echo asset('css/layout/header.css'); ?>">
     <link rel="stylesheet" href="<?php echo asset('css/layout/sidebar.css'); ?>">
     
-    <!-- Componentes (SIEMPRE CARGARLOS) -->
+    <!-- Componentes -->
     <link rel="stylesheet" href="<?php echo asset('css/components/buttons.css'); ?>">
     <link rel="stylesheet" href="<?php echo asset('css/components/cards.css'); ?>">
     <link rel="stylesheet" href="<?php echo asset('css/components/tables.css'); ?>">
@@ -29,77 +115,18 @@ require_once dirname(__DIR__) . '/config.php';
     <link rel="stylesheet" href="<?php echo asset('css/components/alerts.css'); ?>">
     <link rel="stylesheet" href="<?php echo asset('css/components/badges.css'); ?>">
     
-    <!-- Páginas específicas (con parámetro para evitar caché) -->
-    <?php
-    $uri = $_SERVER['REQUEST_URI'];
-    $version = time(); // Versión única para evitar caché
+    <!-- Estilos adicionales del header -->
+    <link rel="stylesheet" href="<?php echo asset('css/layout/header-estilos.css'); ?>?v=<?php echo $version; ?>">
     
-    if (strpos($uri, 'dashboard/index.php') !== false) {
-        echo '<link rel="stylesheet" href="' . asset('css/pages/dashboard.css') . '?v=' . $version . '">';
-    }
+    <!-- CSS específico de la página -->
+    <?php foreach ($page_css as $css_file): ?>
+        <link rel="stylesheet" href="<?php echo asset('css/pages/' . $css_file); ?>?v=<?php echo $version; ?>">
+    <?php endforeach; ?>
     
-    if (strpos($uri, 'ventas/index.php') !== false) {
-        echo '<link rel="stylesheet" href="' . asset('css/pages/ventas.css') . '?v=' . $version . '">';
-    }
     
-    if (strpos($uri, 'ventas/historial.php') !== false) {
-        echo '<link rel="stylesheet" href="' . asset('css/pages/historial.css') . '?v=' . $version . '">';
-    }
+     <!-- Chart.js - Cargar ANTES de otros scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    if (strpos($uri, 'productos/index.php') !== false) {
-        echo '<link rel="stylesheet" href="' . asset('css/pages/productos.css') . '?v=' . $version . '">';
-    }
-    
-    if (strpos($uri, 'productos/ver.php') !== false) {
-        echo '<link rel="stylesheet" href="' . asset('css/pages/producto-ver.css') . '?v=' . $version . '">';
-    }
-    
-    if (strpos($uri, 'productos/nuevo.php') !== false || strpos($uri, 'productos/editar.php') !== false) {
-        echo '<link rel="stylesheet" href="' . asset('css/pages/producto-form.css') . '?v=' . $version . '">';
-    }
-    
-    if (strpos($uri, 'productos/ajustar_stock.php') !== false) {
-        echo '<link rel="stylesheet" href="' . asset('css/pages/ajustar-stock.css') . '?v=' . $version . '">';
-    }
-    
-    if (strpos($uri, 'inventario/entrada_rapida.php') !== false) {
-        echo '<link rel="stylesheet" href="' . asset('css/pages/entrada-rapida.css') . '?v=' . $version . '">';
-    }
-    
-    if (strpos($uri, 'inventario/movimientos.php') !== false) {
-        echo '<link rel="stylesheet" href="' . asset('css/pages/movimientos.css') . '?v=' . $version . '">';
-    }
-    
-    if (strpos($uri, 'inventario/stock_bajo.php') !== false) {
-        echo '<link rel="stylesheet" href="' . asset('css/pages/stock-bajo.css') . '?v=' . $version . '">';
-    }
-    
-    if (strpos($uri, 'categorias/index.php') !== false) {
-        echo '<link rel="stylesheet" href="' . asset('css/pages/categorias.css') . '?v=' . $version . '">';
-    }
-    
-    if (strpos($uri, 'categorias/nuevo.php') !== false || strpos($uri, 'categorias/editar.php') !== false) {
-        echo '<link rel="stylesheet" href="' . asset('css/pages/categoria-form.css') . '?v=' . $version . '">';
-    }
-    
-    if (strpos($uri, 'marcas/index.php') !== false) {
-        echo '<link rel="stylesheet" href="' . asset('css/pages/marcas.css') . '?v=' . $version . '">';
-    }
-    
-    if (strpos($uri, 'clientes/index.php') !== false) {
-        echo '<link rel="stylesheet" href="' . asset('css/pages/clientes.css') . '?v=' . $version . '">';
-    }
-    
-    if (strpos($uri, 'clientes/nuevo.php') !== false || strpos($uri, 'clientes/editar.php') !== false) {
-        echo '<link rel="stylesheet" href="' . asset('css/pages/cliente-form.css') . '?v=' . $version . '">';
-    }
-    
-    if (strpos($uri, 'reportes/corte_caja.php') !== false) {
-        echo '<link rel="stylesheet" href="' . asset('css/pages/corte_caja.css') . '?v=' . $version . '">';
-    }
-    ?>
-    
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
@@ -143,7 +170,9 @@ require_once dirname(__DIR__) . '/config.php';
                     <div class="relative" id="notificationContainer">
                         <button id="notificationBtn" class="icon-button">
                             <i class="fas fa-bell"></i>
-                            <span class="notification-badge"></span>
+                            <?php if ($notificaciones_no_leidas > 0): ?>
+                                <span class="notification-badge"></span>
+                            <?php endif; ?>
                         </button>
                         
                         <!-- Dropdown notificaciones -->
@@ -151,70 +180,33 @@ require_once dirname(__DIR__) . '/config.php';
                             <div class="dropdown-header">
                                 <div class="dropdown-header-content">
                                     <h4 class="dropdown-title">Notificaciones</h4>
-                                    <span class="dropdown-link">Marcar todas</span>
+                                    <span class="dropdown-link" onclick="marcarTodasLeidas()">Marcar todas</span>
                                 </div>
                             </div>
                             
                             <div class="dropdown-content">
-                                <!-- Notificación stock bajo -->
-                                <div class="dropdown-item bg-blue-50">
-                                    <div class="item-icon bg-yellow-100">
-                                        <i class="fas fa-box"></i>
+                                <?php if (count($notificaciones) > 0): ?>
+                                    <?php foreach ($notificaciones as $notif): ?>
+                                    <a href="<?php echo $notif['enlace']; ?>" class="dropdown-item <?php echo $notif['color']; ?>" style="text-decoration: none;">
+                                        <div class="item-icon <?php echo $notif['color']; ?>">
+                                            <i class="fas <?php echo $notif['icono']; ?>"></i>
+                                        </div>
+                                        <div class="item-content">
+                                            <p class="item-title">
+                                                <strong><?php echo $notif['titulo']; ?>:</strong> <?php echo $notif['mensaje']; ?>
+                                            </p>
+                                            <p class="item-time">
+                                                <i class="far fa-clock"></i> <?php echo $notif['tiempo']; ?>
+                                            </p>
+                                        </div>
+                                    </a>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <div class="dropdown-item" style="text-align: center; color: var(--gray-500);">
+                                        <i class="fas fa-check-circle" style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--success);"></i>
+                                        <p>No hay notificaciones</p>
                                     </div>
-                                    <div class="item-content">
-                                        <p class="item-title">
-                                            <strong>Stock bajo:</strong> Martillo (5 unidades)
-                                        </p>
-                                        <p class="item-time">
-                                            <i class="far fa-clock"></i> Hace 5 minutos
-                                        </p>
-                                    </div>
-                                </div>
-                                
-                                <!-- Notificación venta -->
-                                <div class="dropdown-item">
-                                    <div class="item-icon bg-green-100">
-                                        <i class="fas fa-shopping-cart"></i>
-                                    </div>
-                                    <div class="item-content">
-                                        <p class="item-title">
-                                            <strong>Nueva venta:</strong> #V001234 - $1,250.00
-                                        </p>
-                                        <p class="item-time">
-                                            <i class="far fa-clock"></i> Hace 30 minutos
-                                        </p>
-                                    </div>
-                                </div>
-                                
-                                <!-- Notificación usuario -->
-                                <div class="dropdown-item">
-                                    <div class="item-icon bg-purple-100">
-                                        <i class="fas fa-user-plus"></i>
-                                    </div>
-                                    <div class="item-content">
-                                        <p class="item-title">
-                                            <strong>Nuevo usuario:</strong> María García
-                                        </p>
-                                        <p class="item-time">
-                                            <i class="far fa-clock"></i> Hace 2 horas
-                                        </p>
-                                    </div>
-                                </div>
-                                
-                                <!-- Notificación sistema -->
-                                <div class="dropdown-item bg-blue-50">
-                                    <div class="item-icon bg-red-100">
-                                        <i class="fas fa-shield-alt"></i>
-                                    </div>
-                                    <div class="item-content">
-                                        <p class="item-title">
-                                            <strong>Copia de seguridad:</strong> Completada
-                                        </p>
-                                        <p class="item-time">
-                                            <i class="far fa-clock"></i> Hace 3 horas
-                                        </p>
-                                    </div>
-                                </div>
+                                <?php endif; ?>
                             </div>
                             
                             <div class="dropdown-footer">
@@ -227,11 +219,11 @@ require_once dirname(__DIR__) . '/config.php';
                     <div class="relative" id="userContainer">
                         <button id="userMenuBtn" class="user-menu-button">
                             <div class="user-avatar">
-                                A
+                                <?php echo $iniciales; ?>
                             </div>
                             <div class="user-info">
-                                <p class="user-name">Admin User</p>
-                                <p class="user-role">Administrador</p>
+                                <p class="user-name"><?php echo h($usuario_actual['nombre']); ?></p>
+                                <p class="user-role"><?php echo ucfirst($usuario_actual['rol']); ?></p>
                             </div>
                             <i class="fas fa-chevron-down chevron-icon"></i>
                         </button>
@@ -239,8 +231,8 @@ require_once dirname(__DIR__) . '/config.php';
                         <!-- Dropdown usuario -->
                         <div id="userDropdown" class="dropdown user-dropdown">
                             <div class="user-header">
-                                <p>Admin User</p>
-                                <small>Administrador</small>
+                                <p><?php echo h($usuario_actual['nombre']); ?></p>
+                                <small><?php echo h($usuario_actual['email']); ?></small>
                             </div>
                             
                             <a href="<?php echo url('dashboard/perfil.php'); ?>">
@@ -248,6 +240,7 @@ require_once dirname(__DIR__) . '/config.php';
                                 Mi Perfil
                             </a>
                             
+                            <?php if (hasRole(['admin', 'super_admin'])): ?>
                             <a href="<?php echo url('dashboard/configuracion/index.php'); ?>">
                                 <i class="fas fa-cog"></i>
                                 Configuración
@@ -257,6 +250,7 @@ require_once dirname(__DIR__) . '/config.php';
                                 <i class="fas fa-building"></i>
                                 Datos de la Empresa
                             </a>
+                            <?php endif; ?>
                             
                             <hr>
                             
@@ -265,7 +259,7 @@ require_once dirname(__DIR__) . '/config.php';
                                 Ayuda
                             </a>
                             
-                            <a href="<?php echo url('dashboard/logout.php'); ?>" class="logout-link">
+                            <a href="<?php echo url('dashboard/logout.php'); ?>" class="logout-link" onclick="return confirm('¿Cerrar sesión?')">
                                 <i class="fas fa-sign-out-alt"></i>
                                 Cerrar Sesión
                             </a>
@@ -280,3 +274,6 @@ require_once dirname(__DIR__) . '/config.php';
     <div class="app-container">
         <?php include 'sidebar.php'; ?>
         <main class="main-content" id="mainContent">
+        
+<!-- Scripts del header -->
+<script src="<?php echo asset('js/header.js'); ?>?v=<?php echo $version; ?>"></script>

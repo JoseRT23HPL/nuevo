@@ -15,27 +15,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Validaciones
     if (empty($nombre)) {
-        $error = 'El nombre de la categoría es obligatorio';
+        $error = 'El nombre de la marca es obligatorio';
     } else {
-        // Verificar si ya existe una categoría con ese nombre
-        $stmt = $conn->prepare("SELECT id FROM categorias WHERE nombre = ?");
+        // Verificar si ya existe una marca con ese nombre
+        $stmt = $conn->prepare("SELECT id FROM marcas WHERE nombre = ?");
         $stmt->bind_param("s", $nombre);
         $stmt->execute();
         $result = $stmt->get_result();
         
         if ($result->num_rows > 0) {
-            $error = 'Ya existe una categoría con ese nombre';
+            $error = 'Ya existe una marca con ese nombre';
         } else {
-            // Insertar nueva categoría
-            $stmt = $conn->prepare("INSERT INTO categorias (nombre, descripcion) VALUES (?, ?)");
+            // Insertar nueva marca
+            $stmt = $conn->prepare("INSERT INTO marcas (nombre, descripcion) VALUES (?, ?)");
             $stmt->bind_param("ss", $nombre, $descripcion);
             
             if ($stmt->execute()) {
-                $_SESSION['success'] = "Categoría creada correctamente";
-                header('Location: ' . url('dashboard/categorias/index.php'));
+                $_SESSION['success'] = "Marca creada correctamente";
+                header('Location: ' . url('dashboard/marcas/index.php'));
                 exit;
             } else {
-                $error = 'Error al crear la categoría: ' . $conn->error;
+                $error = 'Error al crear la marca: ' . $conn->error;
             }
         }
     }
@@ -49,15 +49,15 @@ include '../header.php';
     <div class="pv-header-left">
         <div class="pv-logo">
             <i class="fas fa-plus-circle" style="color: var(--primary);"></i>
-            <h1>Nueva Categoría</h1>
+            <h1>Nueva Marca</h1>
         </div>
         <span class="pv-badge">FERREFÁCIL</span>
     </div>
     
     <div class="pv-header-right">
-        <a href="<?php echo url('dashboard/categorias/index.php'); ?>" class="btn-header" style="text-decoration: none;">
+        <a href="<?php echo url('dashboard/marcas/index.php'); ?>" class="btn-header" style="text-decoration: none;">
             <i class="fas fa-arrow-left"></i>
-            Volver a categorías
+            Volver a marcas
         </a>
     </div>
 </div>
@@ -73,37 +73,25 @@ include '../header.php';
     </div>
     <?php endif; ?>
     
-    <?php if ($success): ?>
-    <div class="alerta success">
-        <i class="fas fa-check-circle"></i>
-        <div class="alerta-content">
-            <p><?php echo $success; ?></p>
-            <a href="<?php echo url('dashboard/categorias/index.php'); ?>" class="btn-primary small" style="margin-top: 0.5rem;">
-                ← Volver a categorías
-            </a>
-        </div>
-    </div>
-    <?php endif; ?>
-    
-    <!-- Formulario de nueva categoría -->
-    <div class="categoria-form-wrapper">
-        <form method="POST" class="categoria-form">
+    <!-- Formulario de nueva marca -->
+    <div class="marca-form-wrapper">
+        <form method="POST" class="marca-form">
             <div class="form-icon-header">
-                <i class="fas fa-tag"></i>
-                <h3>Información de la categoría</h3>
+                <i class="fas fa-trademark"></i>
+                <h3>Información de la marca</h3>
             </div>
             
-            <!-- Nombre de la categoría -->
+            <!-- Nombre de la marca -->
             <div class="form-group">
                 <label class="form-label">
                     <i class="fas fa-heading"></i>
-                    Nombre de la categoría <span class="required">*</span>
+                    Nombre de la marca <span class="required">*</span>
                 </label>
                 <input type="text" name="nombre" class="form-input" 
-                       placeholder="Ej: Herramientas Manuales" 
+                       placeholder="Ej: Truper" 
                        value="<?php echo h($nombre); ?>"
                        required autofocus>
-                <small class="form-hint">Nombre único para identificar la categoría</small>
+                <small class="form-hint">Nombre único para identificar la marca</small>
             </div>
             
             <!-- Descripción -->
@@ -113,8 +101,8 @@ include '../header.php';
                     Descripción
                 </label>
                 <textarea name="descripcion" class="form-textarea" rows="4" 
-                          placeholder="Describe brevemente esta categoría..."><?php echo h($descripcion); ?></textarea>
-                <small class="form-hint">Opcional - Una breve descripción de la categoría</small>
+                          placeholder="Describe brevemente esta marca..."><?php echo h($descripcion); ?></textarea>
+                <small class="form-hint">Opcional - Una breve descripción de la marca</small>
             </div>
             
             <!-- Información adicional -->
@@ -122,7 +110,7 @@ include '../header.php';
                 <i class="fas fa-info-circle"></i>
                 <div class="info-box-content">
                     <h4>Información importante</h4>
-                    <p>El nombre de la categoría debe ser único en el sistema. Las categorías te ayudan a organizar mejor tus productos.</p>
+                    <p>El nombre de la marca debe ser único en el sistema. Las marcas te ayudan a organizar mejor tus productos.</p>
                 </div>
             </div>
             
@@ -130,10 +118,10 @@ include '../header.php';
             <div class="form-actions">
                 <button type="submit" class="btn-submit">
                     <i class="fas fa-save"></i>
-                    Guardar Categoría
+                    Guardar Marca
                 </button>
                 
-                <a href="<?php echo url('dashboard/categorias/index.php'); ?>" class="btn-cancel">
+                <a href="<?php echo url('dashboard/marcas/index.php'); ?>" class="btn-cancel">
                     <i class="fas fa-times"></i>
                     Cancelar
                 </a>
@@ -141,36 +129,48 @@ include '../header.php';
         </form>
     </div>
     
-    <!-- Ejemplos de categorías de ferretería -->
+    <!-- Ejemplos de marcas de ferretería -->
     <div class="ejemplos-container" style="margin-top: 2rem;">
         <div class="ejemplos-header">
             <i class="fas fa-lightbulb"></i>
-            <span>Ejemplos de categorías</span>
+            <span>Ejemplos de marcas</span>
         </div>
         <div class="ejemplos-grid">
-            <div class="ejemplo-item" onclick="document.querySelector('input[name=\"nombre\"]').value = 'Herramientas Manuales'">
-                <i class="fas fa-wrench"></i>
-                <span>Herramientas Manuales</span>
+            <div class="ejemplo-item" onclick="document.querySelector('input[name=\"nombre\"]').value = 'Truper'">
+                <i class="fas fa-trademark"></i>
+                <span>Truper</span>
             </div>
-            <div class="ejemplo-item" onclick="document.querySelector('input[name=\"nombre\"]').value = 'Herramientas Eléctricas'">
-                <i class="fas fa-bolt"></i>
-                <span>Herramientas Eléctricas</span>
+            <div class="ejemplo-item" onclick="document.querySelector('input[name=\"nombre\"]').value = 'Pretul'">
+                <i class="fas fa-trademark"></i>
+                <span>Pretul</span>
             </div>
-            <div class="ejemplo-item" onclick="document.querySelector('input[name=\"nombre\"]').value = 'Materiales Construcción'">
-                <i class="fas fa-tools"></i>
-                <span>Materiales Construcción</span>
+            <div class="ejemplo-item" onclick="document.querySelector('input[name=\"nombre\"]').value = 'Volteck'">
+                <i class="fas fa-trademark"></i>
+                <span>Volteck</span>
             </div>
-            <div class="ejemplo-item" onclick="document.querySelector('input[name=\"nombre\"]').value = 'Tubería y Conexiones'">
-                <i class="fas fa-water"></i>
-                <span>Tubería y Conexiones</span>
+            <div class="ejemplo-item" onclick="document.querySelector('input[name=\"nombre\"]').value = 'Stanley'">
+                <i class="fas fa-trademark"></i>
+                <span>Stanley</span>
             </div>
-            <div class="ejemplo-item" onclick="document.querySelector('input[name=\"nombre\"]').value = 'Pinturas'">
-                <i class="fas fa-paint-brush"></i>
-                <span>Pinturas</span>
+            <div class="ejemplo-item" onclick="document.querySelector('input[name=\"nombre\"]').value = 'Bosch'">
+                <i class="fas fa-trademark"></i>
+                <span>Bosch</span>
             </div>
-            <div class="ejemplo-item" onclick="document.querySelector('input[name=\"nombre\"]').value = 'Electricidad'">
-                <i class="fas fa-bolt"></i>
-                <span>Electricidad</span>
+            <div class="ejemplo-item" onclick="document.querySelector('input[name=\"nombre\"]').value = 'Makita'">
+                <i class="fas fa-trademark"></i>
+                <span>Makita</span>
+            </div>
+            <div class="ejemplo-item" onclick="document.querySelector('input[name=\"nombre\"]').value = '3M'">
+                <i class="fas fa-trademark"></i>
+                <span>3M</span>
+            </div>
+            <div class="ejemplo-item" onclick="document.querySelector('input[name=\"nombre\"]').value = 'Cruz Azul'">
+                <i class="fas fa-trademark"></i>
+                <span>Cruz Azul</span>
+            </div>
+            <div class="ejemplo-item" onclick="document.querySelector('input[name=\"nombre\"]').value = 'Comex'">
+                <i class="fas fa-trademark"></i>
+                <span>Comex</span>
             </div>
         </div>
     </div>
@@ -189,12 +189,12 @@ include '../header.php';
     }
 }
 
-.categoria-form {
+.marca-form {
     animation: fadeInForm 0.3s ease-out;
 }
 
-/* Estilos específicos para el formulario de categorías */
-.categoria-form-wrapper {
+/* Estilos específicos para el formulario de marcas */
+.marca-form-wrapper {
     background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-lg);
@@ -226,7 +226,7 @@ include '../header.php';
     margin: 0;
 }
 
-/* Ejemplos de categorías */
+/* Ejemplos de marcas */
 .ejemplos-container {
     background: white;
     border: 1px solid var(--gray-200);

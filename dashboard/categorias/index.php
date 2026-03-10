@@ -1,65 +1,64 @@
 <?php
-include '../header.php';
+require_once '../../config.php';
+requiereAuth();
 
-// Datos de ejemplo para categorías de ferretería
-$categorias = [
-    [
-        'id' => 1,
-        'nombre' => 'Herramientas Manuales',
-        'descripcion' => 'Martillos, desarmadores, llaves, alicates y más',
-        'activo' => true,
-        'total_productos' => 45
-    ],
-    [
-        'id' => 2,
-        'nombre' => 'Herramientas Eléctricas',
-        'descripcion' => 'Taladros, esmeriles, sierras, lijadoras',
-        'activo' => true,
-        'total_productos' => 28
-    ],
-    [
-        'id' => 3,
-        'nombre' => 'Materiales de Construcción',
-        'descripcion' => 'Cemento, varilla, block, arena, grava',
-        'activo' => true,
-        'total_productos' => 32
-    ],
-    [
-        'id' => 4,
-        'nombre' => 'Tubería y Conexiones',
-        'descripcion' => 'Tubos PVC, conexiones, codos, adaptadores',
-        'activo' => true,
-        'total_productos' => 56
-    ],
-    [
-        'id' => 5,
-        'nombre' => 'Pinturas y Accesorios',
-        'descripcion' => 'Pinturas vinílicas, esmaltes, thinner, brochas',
-        'activo' => true,
-        'total_productos' => 23
-    ],
-    [
-        'id' => 6,
-        'nombre' => 'Electricidad',
-        'descripcion' => 'Cables, interruptores, contactos, fusibles',
-        'activo' => false,
-        'total_productos' => 19
-    ],
-    [
-        'id' => 7,
-        'nombre' => 'Ferretería General',
-        'descripcion' => 'Clavos, tornillos, taquetes, pegamentos',
-        'activo' => true,
-        'total_productos' => 67
-    ],
-    [
-        'id' => 8,
-        'nombre' => 'Seguridad Industrial',
-        'descripcion' => 'Cascos, guantes, lentes, arneses',
-        'activo' => true,
-        'total_productos' => 14
-    ]
-];
+$conn = getDB();
+
+// Procesar eliminación (si viene por GET)
+if (isset($_GET['delete'])) {
+    $id = (int)$_GET['delete'];
+    
+    // Verificar si tiene productos asociados
+    $stmt = $conn->prepare("SELECT COUNT(*) as total FROM productos WHERE id_categoria = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $check = $result->fetch_assoc();
+    
+    if ($check['total'] == 0) {
+        // Eliminar categoría
+        $stmt = $conn->prepare("DELETE FROM categorias WHERE id = ?");
+        $stmt->bind_param("i", $id);
+        if ($stmt->execute()) {
+            $_SESSION['success'] = "Categoría eliminada correctamente";
+        } else {
+            $_SESSION['error'] = "Error al eliminar la categoría";
+        }
+    } else {
+        $_SESSION['error'] = "No se puede eliminar la categoría porque tiene {$check['total']} productos asociados";
+    }
+    
+    header('Location: ' . url('dashboard/categorias/index.php'));
+    exit;
+}
+
+// Obtener todas las categorías con conteo de productos
+$categorias = [];
+$sql = "
+    SELECT c.*, 
+           (SELECT COUNT(*) FROM productos WHERE id_categoria = c.id) as total_productos
+    FROM categorias c
+    ORDER BY c.nombre ASC
+";
+$result = $conn->query($sql);
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
+        $categorias[] = $row;
+    }
+}
+
+// Mostrar mensajes de sesión
+if (isset($_SESSION['success'])) {
+    $success = $_SESSION['success'];
+    unset($_SESSION['success']);
+}
+
+if (isset($_SESSION['error'])) {
+    $error = $_SESSION['error'];
+    unset($_SESSION['error']);
+}
+
+include '../header.php';
 ?>
 
 <!-- Header de Categorías -->
@@ -73,25 +72,27 @@ $categorias = [
     </div>
     
     <div class="pv-header-right">
-        <a href="/dashboard/categorias/nuevo.php" class="btn-header primary" style="text-decoration: none;">
+        <a href="<?php echo url('dashboard/categorias/nuevo.php'); ?>" class="btn-header primary" style="text-decoration: none;">
             <i class="fas fa-plus"></i>
             Nueva Categoría
         </a>
     </div>
 </div>
 
-<!-- Mensajes de alerta (ejemplos comentados) -->
-<!-- 
+<!-- Mensajes de alerta -->
+<?php if (isset($success)): ?>
 <div class="alerta success">
     <i class="fas fa-check-circle"></i>
-    <p>Categoría eliminada correctamente</p>
+    <p><?php echo h($success); ?></p>
 </div>
+<?php endif; ?>
 
+<?php if (isset($error)): ?>
 <div class="alerta error">
     <i class="fas fa-exclamation-circle"></i>
-    <p>No se puede eliminar la categoría porque tiene productos asociados</p>
+    <p><?php echo h($error); ?></p>
 </div>
--->
+<?php endif; ?>
 
 <!-- Tabla de categorías -->
 <div class="categorias-container">
@@ -108,80 +109,83 @@ $categorias = [
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($categorias as $cat): ?>
-                <tr class="fila-categoria">
-                    <td class="col-id">#<?php echo str_pad($cat['id'], 2, '0', STR_PAD_LEFT); ?></td>
-                    <td class="col-nombre">
-                        <span class="categoria-nombre"><?php echo $cat['nombre']; ?></span>
-                    </td>
-                    <td class="col-descripcion">
-                        <?php if ($cat['descripcion']): ?>
-                            <span class="categoria-descripcion"><?php echo $cat['descripcion']; ?></span>
-                        <?php else: ?>
-                            <span class="sin-descripcion">Sin descripción</span>
-                        <?php endif; ?>
-                    </td>
-                    <td class="text-center">
-                        <span class="badge-productos"><?php echo $cat['total_productos']; ?></span>
-                    </td>
-                    <td class="text-center">
-                        <?php if ($cat['activo']): ?>
-                            <span class="estado-badge activo">Activo</span>
-                        <?php else: ?>
-                            <span class="estado-badge inactivo">Inactivo</span>
-                        <?php endif; ?>
-                    </td>
-                    <td class="col-acciones">
-                        <div class="acciones-wrapper">
-                            <a href="/dashboard/categorias/editar.php?id=<?php echo $cat['id']; ?>" 
-                               class="accion-icon" title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            
-                            <?php if ($cat['total_productos'] == 0): ?>
-                                <a href="?delete=<?php echo $cat['id']; ?>" 
-                                   class="accion-icon eliminar" 
-                                   title="Eliminar"
-                                   onclick="return confirm('¿Estás seguro de eliminar esta categoría?')">
-                                    <i class="fas fa-trash"></i>
-                                </a>
+                <?php if (count($categorias) > 0): ?>
+                    <?php foreach ($categorias as $cat): ?>
+                    <tr class="fila-categoria">
+                        <td class="col-id">#<?php echo str_pad($cat['id'], 2, '0', STR_PAD_LEFT); ?></td>
+                        <td class="col-nombre">
+                            <span class="categoria-nombre"><?php echo h($cat['nombre']); ?></span>
+                        </td>
+                        <td class="col-descripcion">
+                            <?php if ($cat['descripcion']): ?>
+                                <span class="categoria-descripcion"><?php echo h($cat['descripcion']); ?></span>
                             <?php else: ?>
-                                <span class="accion-icon disabled" 
-                                      title="No se puede eliminar (tiene <?php echo $cat['total_productos']; ?> productos)">
-                                    <i class="fas fa-trash"></i>
-                                </span>
+                                <span class="sin-descripcion">Sin descripción</span>
                             <?php endif; ?>
-                        </div>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge-productos"><?php echo $cat['total_productos']; ?></span>
+                        </td>
+                        <td class="text-center">
+                            <?php if ($cat['activo']): ?>
+                                <span class="estado-badge activo">Activo</span>
+                            <?php else: ?>
+                                <span class="estado-badge inactivo">Inactivo</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="col-acciones">
+                            <div class="acciones-wrapper">
+                                <a href="<?php echo url('dashboard/categorias/editar.php?id=' . $cat['id']); ?>" 
+                                   class="accion-icon" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                
+                                <?php if ($cat['total_productos'] == 0): ?>
+                                    <a href="?delete=<?php echo $cat['id']; ?>" 
+                                       class="accion-icon eliminar" 
+                                       title="Eliminar"
+                                       onclick="return confirm('¿Estás seguro de eliminar esta categoría?')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                <?php else: ?>
+                                    <span class="accion-icon disabled" 
+                                          title="No se puede eliminar (tiene <?php echo $cat['total_productos']; ?> productos)">
+                                        <i class="fas fa-trash"></i>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="6" class="empty-state-row">
+                            <div class="empty-state-icon">
+                                <i class="fas fa-tags"></i>
+                            </div>
+                            <h3>No hay categorías creadas</h3>
+                            <p>Comienza creando tu primera categoría</p>
+                            <a href="<?php echo url('dashboard/categorias/nuevo.php'); ?>" class="btn-header primary">
+                                <i class="fas fa-plus"></i>
+                                Nueva Categoría
+                            </a>
+                        </td>
+                    </tr>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
     
     <!-- Resumen -->
+    <?php if (count($categorias) > 0): ?>
     <div class="tabla-footer">
         <p class="resumen-info">
             <i class="fas fa-tags"></i>
             Total: <strong><?php echo count($categorias); ?></strong> categorías
         </p>
     </div>
+    <?php endif; ?>
 </div>
-
-<!-- Empty state (comentado por si no hay categorías) -->
-<!-- 
-<div class="empty-state">
-    <div class="empty-icon">
-        <i class="fas fa-tags"></i>
-    </div>
-    <h3>No hay categorías creadas</h3>
-    <p>Comienza creando tu primera categoría</p>
-    <a href="/dashboard/categorias/nuevo.php" class="btn-header primary">
-        <i class="fas fa-plus"></i>
-        Nueva Categoría
-    </a>
-</div>
--->
 
 <style>
 /* Animaciones para las filas */
@@ -200,14 +204,36 @@ $categorias = [
     animation: fadeInRow 0.3s ease-out forwards;
 }
 
-.fila-categoria:nth-child(1) { animation-delay: 0.02s; }
-.fila-categoria:nth-child(2) { animation-delay: 0.04s; }
-.fila-categoria:nth-child(3) { animation-delay: 0.06s; }
-.fila-categoria:nth-child(4) { animation-delay: 0.08s; }
-.fila-categoria:nth-child(5) { animation-delay: 0.10s; }
-.fila-categoria:nth-child(6) { animation-delay: 0.12s; }
-.fila-categoria:nth-child(7) { animation-delay: 0.14s; }
-.fila-categoria:nth-child(8) { animation-delay: 0.16s; }
+/* Estilos para el empty state */
+.empty-state-row {
+    text-align: center;
+    padding: 3rem !important;
+}
+
+.empty-state-icon {
+    width: 5rem;
+    height: 5rem;
+    margin: 0 auto 1.5rem;
+    background-color: var(--gray-100);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    color: var(--gray-400);
+}
+
+.empty-state-row h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-row p {
+    color: var(--gray-500);
+    margin-bottom: 1rem;
+}
 </style>
 
 <?php include '../footer.php'; ?>

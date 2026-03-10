@@ -7,32 +7,32 @@ $conn = getDB();
 $error = '';
 $success = '';
 
-// Obtener ID de la categoría
+// Obtener ID de la marca
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 if ($id <= 0) {
-    header('Location: ' . url('dashboard/categorias/index.php'));
+    header('Location: ' . url('dashboard/marcas/index.php'));
     exit;
 }
 
-// Obtener datos actuales de la categoría
-$stmt = $conn->prepare("SELECT * FROM categorias WHERE id = ?");
+// Obtener datos actuales de la marca
+$stmt = $conn->prepare("SELECT * FROM marcas WHERE id = ?");
 $stmt->bind_param("i", $id);
 $stmt->execute();
 $result = $stmt->get_result();
-$categoria = $result->fetch_assoc();
+$marca = $result->fetch_assoc();
 
-if (!$categoria) {
-    header('Location: ' . url('dashboard/categorias/index.php'));
+if (!$marca) {
+    header('Location: ' . url('dashboard/marcas/index.php'));
     exit;
 }
 
-// Obtener productos asociados a esta categoría
+// Obtener productos asociados a esta marca
 $productos = [];
 $stmt = $conn->prepare("
     SELECT id, nombre, sku, stock_actual 
     FROM productos 
-    WHERE id_categoria = ? 
+    WHERE id_marca = ? 
     ORDER BY fecha_creacion DESC 
     LIMIT 5
 ");
@@ -56,7 +56,7 @@ $stmt = $conn->prepare("
         SUM(CASE WHEN stock_actual > 0 THEN 1 ELSE 0 END) as con_stock,
         SUM(CASE WHEN stock_actual = 0 THEN 1 ELSE 0 END) as agotados
     FROM productos 
-    WHERE id_categoria = ?
+    WHERE id_marca = ?
 ");
 $stmt->bind_param("i", $id);
 $stmt->execute();
@@ -70,27 +70,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Validaciones
     if (empty($nombre)) {
-        $error = 'El nombre de la categoría es obligatorio';
+        $error = 'El nombre de la marca es obligatorio';
     } else {
-        // Verificar si ya existe otra categoría con ese nombre (excluyendo la actual)
-        $stmt = $conn->prepare("SELECT id FROM categorias WHERE nombre = ? AND id != ?");
+        // Verificar si ya existe otra marca con ese nombre (excluyendo la actual)
+        $stmt = $conn->prepare("SELECT id FROM marcas WHERE nombre = ? AND id != ?");
         $stmt->bind_param("si", $nombre, $id);
         $stmt->execute();
         $result = $stmt->get_result();
         
         if ($result->num_rows > 0) {
-            $error = 'Ya existe otra categoría con ese nombre';
+            $error = 'Ya existe otra marca con ese nombre';
         } else {
-            // Actualizar categoría
-            $stmt = $conn->prepare("UPDATE categorias SET nombre = ?, descripcion = ?, activo = ? WHERE id = ?");
+            // Actualizar marca
+            $stmt = $conn->prepare("UPDATE marcas SET nombre = ?, descripcion = ?, activo = ? WHERE id = ?");
             $stmt->bind_param("ssii", $nombre, $descripcion, $activo, $id);
             
             if ($stmt->execute()) {
-                $_SESSION['success'] = "Categoría actualizada correctamente";
-                header('Location: ' . url('dashboard/categorias/index.php'));
+                $_SESSION['success'] = "Marca actualizada correctamente";
+                header('Location: ' . url('dashboard/marcas/index.php'));
                 exit;
             } else {
-                $error = 'Error al actualizar la categoría: ' . $conn->error;
+                $error = 'Error al actualizar la marca: ' . $conn->error;
             }
         }
     }
@@ -104,15 +104,15 @@ include '../header.php';
     <div class="pv-header-left">
         <div class="pv-logo">
             <i class="fas fa-edit" style="color: var(--primary);"></i>
-            <h1>Editar Categoría</h1>
+            <h1>Editar Marca</h1>
         </div>
         <span class="pv-badge">FERREFÁCIL</span>
     </div>
     
     <div class="pv-header-right">
-        <a href="<?php echo url('dashboard/categorias/index.php'); ?>" class="btn-header" style="text-decoration: none;">
+        <a href="<?php echo url('dashboard/marcas/index.php'); ?>" class="btn-header" style="text-decoration: none;">
             <i class="fas fa-arrow-left"></i>
-            Volver a categorías
+            Volver a marcas
         </a>
     </div>
 </div>
@@ -128,27 +128,27 @@ include '../header.php';
     </div>
     <?php endif; ?>
     
-    <!-- Formulario de edición de categoría -->
-    <div class="categoria-form-wrapper">
+    <!-- Formulario de edición de marca -->
+    <div class="marca-form-wrapper">
         <div class="form-icon-header">
-            <i class="fas fa-tag"></i>
-            <h3>Editando: <?php echo h($categoria['nombre']); ?></h3>
+            <i class="fas fa-trademark"></i>
+            <h3>Editando: <?php echo h($marca['nombre']); ?></h3>
         </div>
         
-        <form method="POST" class="categoria-form">
+        <form method="POST" class="marca-form">
             <!-- ID oculto -->
-            <input type="hidden" name="id" value="<?php echo $categoria['id']; ?>">
+            <input type="hidden" name="id" value="<?php echo $marca['id']; ?>">
             
-            <!-- Nombre de la categoría -->
+            <!-- Nombre de la marca -->
             <div class="form-group">
                 <label class="form-label">
                     <i class="fas fa-heading"></i>
-                    Nombre de la categoría <span class="required">*</span>
+                    Nombre de la marca <span class="required">*</span>
                 </label>
                 <input type="text" name="nombre" class="form-input" 
-                       value="<?php echo h($categoria['nombre']); ?>" 
-                       placeholder="Ej: Herramientas Manuales" required autofocus>
-                <small class="form-hint">Nombre único para identificar la categoría</small>
+                       value="<?php echo h($marca['nombre']); ?>" 
+                       placeholder="Ej: Truper" required autofocus>
+                <small class="form-hint">Nombre único para identificar la marca</small>
             </div>
             
             <!-- Descripción -->
@@ -158,17 +158,17 @@ include '../header.php';
                     Descripción
                 </label>
                 <textarea name="descripcion" class="form-textarea" rows="4" 
-                          placeholder="Describe brevemente esta categoría..."><?php echo h($categoria['descripcion']); ?></textarea>
-                <small class="form-hint">Opcional - Una breve descripción de la categoría</small>
+                          placeholder="Describe brevemente esta marca..."><?php echo h($marca['descripcion']); ?></textarea>
+                <small class="form-hint">Opcional - Una breve descripción de la marca</small>
             </div>
             
             <!-- Estado activo/inactivo (checkbox personalizado) -->
             <div class="form-group">
                 <label class="checkbox-label">
                     <input type="checkbox" name="activo" class="checkbox-input" 
-                           <?php echo $categoria['activo'] ? 'checked' : ''; ?>>
+                           <?php echo $marca['activo'] ? 'checked' : ''; ?>>
                     <span class="checkbox-custom"></span>
-                    <span class="checkbox-text">Categoría activa</span>
+                    <span class="checkbox-text">Marca activa</span>
                 </label>
                 <small class="form-hint" style="margin-left: 1.7rem;">
                     Si está inactiva, no aparecerá al crear productos
@@ -180,7 +180,7 @@ include '../header.php';
                 <i class="fas fa-info-circle"></i>
                 <div class="info-box-content">
                     <h4>Información importante</h4>
-                    <p>El nombre de la categoría debe ser único en el sistema. Al desactivar una categoría, los productos existentes mantendrán su clasificación pero no podrás asignarla a nuevos productos.</p>
+                    <p>El nombre de la marca debe ser único en el sistema. Al desactivar una marca, los productos existentes mantendrán su clasificación pero no podrás asignarla a nuevos productos.</p>
                 </div>
             </div>
             
@@ -191,7 +191,7 @@ include '../header.php';
                     Guardar Cambios
                 </button>
                 
-                <a href="<?php echo url('dashboard/categorias/index.php'); ?>" class="btn-cancel">
+                <a href="<?php echo url('dashboard/marcas/index.php'); ?>" class="btn-cancel">
                     <i class="fas fa-times"></i>
                     Cancelar
                 </a>
@@ -204,7 +204,7 @@ include '../header.php';
     <div class="productos-asociados" style="margin-top: 2rem;">
         <div class="productos-header">
             <i class="fas fa-boxes"></i>
-            <span>Productos en esta categoría</span>
+            <span>Productos de esta marca</span>
         </div>
         
         <div class="productos-stats">
@@ -230,11 +230,11 @@ include '../header.php';
                 <li>
                     <i class="fas fa-cube"></i> 
                     <?php echo h($p['nombre']); ?> 
-                    <small style="color: var(--gray-500);">(Stock: <?php echo $p['stock_actual']; ?>)</small>
+                    <small style="color: var(--gray-500);">(SKU: <?php echo h($p['sku']); ?> | Stock: <?php echo $p['stock_actual']; ?>)</small>
                 </li>
                 <?php endforeach; ?>
             </ul>
-            <a href="<?php echo url('dashboard/productos/index.php?categoria=' . $categoria['id']); ?>" class="ver-mas">
+            <a href="<?php echo url('dashboard/productos/index.php?marca=' . $marca['id']); ?>" class="ver-mas">
                 Ver todos los productos →
             </a>
         </div>
@@ -256,7 +256,7 @@ include '../header.php';
     }
 }
 
-.categoria-form {
+.marca-form {
     animation: fadeInForm 0.3s ease-out;
 }
 
@@ -303,7 +303,7 @@ include '../header.php';
     color: var(--gray-700);
 }
 
-/* Productos asociados */
+/* Estilos para productos asociados */
 .productos-asociados {
     background: white;
     border: 1px solid var(--gray-200);
@@ -390,6 +390,11 @@ include '../header.php';
     text-align: center;
 }
 
+.productos-lista-preview li small {
+    font-size: 0.7rem;
+    color: var(--gray-500);
+}
+
 .ver-mas {
     color: var(--primary);
     text-decoration: none;
@@ -403,9 +408,42 @@ include '../header.php';
     text-decoration: underline;
 }
 
+/* Estilos específicos para el formulario de marcas */
+.marca-form-wrapper {
+    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-md);
+}
+
+.form-icon-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--primary);
+}
+
+.form-icon-header i {
+    font-size: 1.25rem;
+    color: var(--primary);
+    background: var(--primary-alpha);
+    padding: 0.75rem;
+    border-radius: 50%;
+}
+
+.form-icon-header h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin: 0;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
-    .categoria-form-wrapper {
+    .marca-form-wrapper {
         padding: 1.5rem;
     }
     

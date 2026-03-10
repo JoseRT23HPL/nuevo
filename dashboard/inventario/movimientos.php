@@ -73,14 +73,14 @@ include '../header.php';
 <div class="pv-header">
     <div class="pv-header-left">
         <div class="pv-logo">
-            <i class="fas fa-history" style="color: var(--primary);"></i>
+            <i class="fas fa-history"></i>
             <h1>Historial de Movimientos</h1>
         </div>
         <span class="pv-badge">INVENTARIO</span>
     </div>
     
     <div class="pv-header-right">
-        <a href="<?php echo url('dashboard/inventario/index.php'); ?>" class="btn-header" style="text-decoration: none;">
+        <a href="<?php echo url('dashboard/inventario/index.php'); ?>" class="btn-header">
             <i class="fas fa-arrow-left"></i>
             Volver a Inventario
         </a>

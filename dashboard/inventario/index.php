@@ -72,18 +72,18 @@ include '../header.php';
 <div class="pv-header">
     <div class="pv-header-left">
         <div class="pv-logo">
-            <i class="fas fa-warehouse" style="color: var(--primary);"></i>
+            <i class="fas fa-warehouse"></i>
             <h1>Panel de Inventario</h1>
         </div>
         <span class="pv-badge">GESTIÓN</span>
     </div>
     
-    <div class="pv-header-right" style="gap: 0.75rem;">
-        <a href="<?php echo url('dashboard/productos/entrada_rapida.php'); ?>" class="btn-header" style="text-decoration: none;">
+    <div class="pv-header-right">
+        <a href="<?php echo url('dashboard/productos/entrada_rapida.php'); ?>" class="btn-header">
             <i class="fas fa-barcode"></i>
             Entrada Rápida
         </a>
-        <a href="<?php echo url('dashboard/inventario/ajuste_masivo.php'); ?>" class="btn-header" style="text-decoration: none; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white;">
+        <a href="<?php echo url('dashboard/inventario/ajuste_masivo.php'); ?>" class="btn-header special">
             <i class="fas fa-cubes"></i>
             Ajuste Masivo
         </a>

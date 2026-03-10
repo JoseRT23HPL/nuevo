@@ -159,14 +159,14 @@ include '../header.php';
 <div class="pv-header">
     <div class="pv-header-left">
         <div class="pv-logo">
-            <i class="fas fa-plus-circle" style="color: var(--primary);"></i>
+            <i class="fas fa-plus-circle"></i>
             <h1>Nuevo Producto</h1>
         </div>
         <span class="pv-badge">CREAR</span>
     </div>
     
     <div class="pv-header-right">
-        <a href="/dashboard/productos/index.php" class="btn-header" style="text-decoration: none;">
+        <a href="<?php echo url('dashboard/productos/index.php'); ?>" class="btn-header">
             <i class="fas fa-arrow-left"></i>
             Volver a la lista
         </a>

@@ -1,6 +1,97 @@
-/* ===== DETALLE DE PRODUCTO - ESTILO FACEBOOK ===== */
+/* ========================================
+   PRODUCTO-VER.CSS - DETALLE DE PRODUCTO
+   ======================================== */
 
-/* ===== PERFIL DE PRODUCTO CON IMAGEN CUADRADA ===== */
+/* ===== HEADER DE LA PÁGINA ===== */
+.pv-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.pv-header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.pv-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.pv-logo i {
+    font-size: 1.5rem;
+    color: var(--primary);
+    background: var(--primary-alpha);
+    padding: 0.5rem;
+    border-radius: var(--radius-md);
+}
+
+.pv-logo h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin: 0;
+}
+
+.pv-badge {
+    display: inline-block;
+    padding: 0.25rem 1rem;
+    background: linear-gradient(135deg, var(--primary-alpha) 0%, var(--secondary-alpha) 100%);
+    color: var(--primary);
+    border-radius: var(--radius-lg);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 1px solid var(--primary-light);
+}
+
+.pv-header-right {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.btn-header {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 0.6rem 1.2rem;
+    color: var(--gray-700);
+    font-weight: 500;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.btn-header:hover {
+    background: var(--gray-50);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.btn-header.primary {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    color: white;
+    border: none;
+}
+
+.btn-header.primary:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+/* ===== PERFIL DE PRODUCTO (ESTILO FACEBOOK) ===== */
 .producto-perfil-container {
     background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
     border: 1px solid var(--gray-200);
@@ -176,7 +267,7 @@
     color: white;
 }
 
-/* ===== GRID DE INFORMACIÓN DEL PRODUCTO CON CARDS IGUALADAS ===== */
+/* ===== GRID DE INFORMACIÓN DEL PRODUCTO ===== */
 .producto-info-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -203,7 +294,7 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    min-height: 220px; /* Altura mínima para todos los cards */
+    min-height: 220px;
 }
 
 .card-title {
@@ -227,13 +318,8 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    justify-content: center; /* Centra el contenido verticalmente */
+    justify-content: center;
     gap: 0.75rem;
-}
-
-/* Ajuste específico para clasificación (más espacio entre elementos) */
-.info-col-left .info-card:first-child .card-content {
-    justify-content: space-evenly; /* Distribuye el espacio uniformemente */
 }
 
 /* ===== DESCRIPCIÓN MEJORADA ===== */
@@ -247,7 +333,6 @@
     padding-right: 0.5rem;
 }
 
-/* Scroll personalizado */
 .descripcion-texto::-webkit-scrollbar {
     width: 4px;
 }
@@ -448,6 +533,7 @@
 .tab-btn:hover {
     background-color: var(--gray-100);
     border-color: var(--primary);
+    color: var(--primary);
 }
 
 .tab-btn.active {
@@ -509,6 +595,7 @@
 .tabla-ventas {
     width: 100%;
     border-collapse: collapse;
+    font-size: 0.85rem;
 }
 
 .tabla-movimientos th,
@@ -527,7 +614,7 @@
 .tabla-ventas td {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--gray-200);
-    font-size: 0.875rem;
+    font-size: 0.85rem;
     color: var(--gray-600);
 }
 
@@ -560,6 +647,7 @@
     color: #b45309;
 }
 
+/* ===== CANTIDADES ===== */
 .cantidad.entrada {
     color: var(--success);
     font-weight: 600;
@@ -568,25 +656,6 @@
 .cantidad.salida {
     color: var(--danger);
     font-weight: 600;
-}
-
-.stock-evolucion {
-    font-size: 0.8rem;
-    background-color: var(--gray-100);
-    padding: 0.2rem 0.5rem;
-    border-radius: var(--radius-md);
-}
-
-/* ===== ENLACES DE FOLIO ===== */
-.folio-link {
-    color: var(--primary);
-    text-decoration: none;
-    font-family: monospace;
-    font-weight: 500;
-}
-
-.folio-link:hover {
-    text-decoration: underline;
 }
 
 .cantidad-venta {
@@ -599,7 +668,45 @@
     color: var(--success);
 }
 
-/* ===== ESTADÍSTICAS EN PESTAÑA ===== */
+.stock-evolucion {
+    font-size: 0.8rem;
+    background-color: var(--gray-100);
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-md);
+}
+
+/* ===== ENLACES ===== */
+.folio-link {
+    color: var(--primary);
+    text-decoration: none;
+    font-family: monospace;
+    font-weight: 500;
+}
+
+.folio-link:hover {
+    text-decoration: underline;
+}
+
+.accion-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-md);
+    color: var(--gray-400);
+    transition: all 0.2s;
+    background: white;
+    border: 1px solid var(--gray-200);
+}
+
+.accion-icon:hover {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: white;
+    border-color: transparent;
+}
+
+/* ===== ESTADÍSTICAS ===== */
 .estadisticas-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -735,7 +842,7 @@
     }
     
     .info-card {
-        min-height: auto; /* Elimina altura mínima en móvil */
+        min-height: auto;
     }
     
     .precios-grid {
@@ -749,13 +856,44 @@
     .estadisticas-grid {
         grid-template-columns: 1fr;
     }
+}
+
+@media (max-width: 768px) {
+    .pv-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .pv-header-right {
+        width: 100%;
+    }
+    
+    .btn-header {
+        width: 100%;
+        justify-content: center;
+    }
     
     .tabs-header {
         flex-direction: column;
     }
     
+    .tab-btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
     .tab-header {
         flex-direction: column;
         align-items: flex-start;
+    }
+    
+    .tabla-responsive {
+        overflow-x: auto;
+    }
+    
+    .tabla-movimientos,
+    .tabla-ventas {
+        min-width: 600px;
     }
 }

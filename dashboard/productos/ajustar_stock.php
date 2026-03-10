@@ -152,11 +152,13 @@ include '../header.php';
 <div class="pv-header">
     <div class="pv-header-left">
         <div class="pv-logo">
-            <i class="fas fa-cubes" style="color: var(--primary);"></i>
+            <i class="fas fa-cubes"></i>
             <h1>Ajustar Stock</h1>
         </div>
         <span class="pv-badge">INVENTARIO</span>
     </div>
+    
+   
     
     <div class="pv-header-right" style="gap: 0.75rem;">
         <a href="<?php echo url('dashboard/productos/ver.php?id=' . $producto['id']); ?>" class="btn-header" style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; text-decoration: none;">
