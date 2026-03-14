@@ -25,7 +25,14 @@ function getPageCss($uri, $version) {
         'clientes/index.php' => 'clientes.css',
         'clientes/nuevo.php' => 'cliente-form.css',
         'clientes/editar.php' => 'cliente-form.css',
-        'reportes/corte_caja.php' => 'corte_caja.css'
+        'reportes/corte_caja.php' => 'corte_caja.css',
+        'usuarios/index.php' => 'usuarios.css',           // Lista de usuarios
+        'usuarios/nuevo.php' => 'usuarios.css',           // Nuevo usuario (usa mismo CSS)
+        'usuarios/editar.php' => 'usuarios.css',          // Editar usuario (usa mismo CSS)
+        'usuarios/ver.php' => 'usuarios.css', 
+        'usuarios/cambiar_password.php' => 'usuarios.css',     
+        'reportes/index.php' => 'reportes.css',
+        'reportes/historial_cortes.php' => 'historial_cortes.css',      
     ];
     
     foreach ($pageMappings as $pattern => $cssFile) {

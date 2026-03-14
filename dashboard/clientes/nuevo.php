@@ -1,23 +1,112 @@
 <?php
-include '../header.php';
+require_once '../../config.php';
+requiereAuth();
 
-// Variables para simular mensajes de éxito/error
+$conn = getDB();
+
 $error = '';
 $success = '';
 $cliente_id = null;
 
-// Simular registro exitoso (para pruebas)
+// Valores del formulario (para persistencia)
+$nombre = '';
+$apellidos = '';
+$tipo_documento = 'INE';
+$documento = '';
+$email = '';
+$telefono = '';
+$direccion = '';
+$fecha_nacimiento = '';
+$notas = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Simulación de validación
-    if (empty($_POST['nombre'])) {
+    // Recoger datos del formulario
+    $tipo_documento = $_POST['tipo_documento'] ?? 'INE';
+    $documento = trim($_POST['documento'] ?? '');
+    $nombre = trim($_POST['nombre'] ?? '');
+    $apellidos = trim($_POST['apellidos'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $telefono = trim($_POST['telefono'] ?? '');
+    $direccion = trim($_POST['direccion'] ?? '');
+    $fecha_nacimiento = $_POST['fecha_nacimiento'] ?? null;
+    $notas = trim($_POST['notas'] ?? '');
+    
+    // Validaciones
+    if (empty($nombre)) {
         $error = 'El nombre es obligatorio';
-    } elseif (!empty($_POST['email']) && !filter_var($_POST['email'], FILTER_VALIDATE_EMAIL)) {
+    } elseif (!empty($email) && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Email no válido';
+    } elseif (!empty($telefono) && !preg_match('/^[0-9-]+$/', $telefono)) {
+        $error = 'Teléfono no válido (solo números y guiones)';
     } else {
-        $success = 'Cliente registrado correctamente';
-        $cliente_id = 123; // ID simulado
+        // Verificar si ya existe un cliente con ese documento (si se proporcionó)
+        if (!empty($documento)) {
+            $stmt = $conn->prepare("SELECT id FROM clientes WHERE documento = ?");
+            $stmt->bind_param("s", $documento);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            if ($result->num_rows > 0) {
+                $error = 'Ya existe un cliente con ese documento';
+            }
+        }
+        
+        // Verificar si ya existe un cliente con ese email (si se proporcionó)
+        if (empty($error) && !empty($email)) {
+            $stmt = $conn->prepare("SELECT id FROM clientes WHERE email = ?");
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            if ($result->num_rows > 0) {
+                $error = 'Ya existe un cliente con ese email';
+            }
+        }
+        
+        if (empty($error)) {
+            // Insertar nuevo cliente
+            $stmt = $conn->prepare("
+                INSERT INTO clientes (
+                    tipo_documento, documento, nombre, apellidos, email, 
+                    telefono, direccion, fecha_nacimiento, notas
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            
+            $stmt->bind_param(
+                "sssssssss",
+                $tipo_documento,
+                $documento,
+                $nombre,
+                $apellidos,
+                $email,
+                $telefono,
+                $direccion,
+                $fecha_nacimiento,
+                $notas
+            );
+            
+            if ($stmt->execute()) {
+                $cliente_id = $conn->insert_id;
+                $_SESSION['success'] = "Cliente registrado correctamente";
+                $_SESSION['cliente_id'] = $cliente_id;
+                header('Location: ' . url('dashboard/clientes/index.php'));
+                exit;
+            } else {
+                $error = 'Error al registrar el cliente: ' . $conn->error;
+            }
+        }
     }
 }
+
+// Mostrar mensajes de sesión
+if (isset($_SESSION['success'])) {
+    $success = $_SESSION['success'];
+    unset($_SESSION['success']);
+    $cliente_id = $_SESSION['cliente_id'] ?? null;
+    unset($_SESSION['cliente_id']);
+}
+
+include '../header.php';
 ?>
 
 <!-- Header del formulario -->
@@ -31,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
     
     <div class="pv-header-right">
-        <a href="/dashboard/clientes/index.php" class="btn-header" style="text-decoration: none;">
+        <a href="<?php echo url('dashboard/clientes/index.php'); ?>" class="btn-header" style="text-decoration: none;">
             <i class="fas fa-arrow-left"></i>
             Volver a Clientes
         </a>
@@ -42,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <?php if ($error): ?>
     <div class="alerta error">
         <i class="fas fa-exclamation-circle"></i>
-        <p><?php echo $error; ?></p>
+        <p><?php echo h($error); ?></p>
     </div>
 <?php endif; ?>
 
@@ -52,16 +141,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="alerta-content">
             <p><?php echo $success; ?></p>
             <div class="alerta-acciones">
-                <a href="/dashboard/clientes/nuevo.php" class="btn-primary small">
+                <a href="<?php echo url('dashboard/clientes/nuevo.php'); ?>" class="btn-primary small">
                     <i class="fas fa-plus"></i>
                     Otro Cliente
                 </a>
-                <a href="/dashboard/clientes/index.php" class="btn-secondary small">
+                <a href="<?php echo url('dashboard/clientes/index.php'); ?>" class="btn-secondary small">
                     <i class="fas fa-list"></i>
                     Ver Listado
                 </a>
                 <?php if ($cliente_id): ?>
-                    <a href="/dashboard/clientes/ver.php?id=<?php echo $cliente_id; ?>" class="btn-tertiary small">
+                    <a href="<?php echo url('dashboard/clientes/ver.php?id=' . $cliente_id); ?>" class="btn-tertiary small">
                         <i class="fas fa-eye"></i>
                         Ver Cliente
                     </a>
@@ -82,7 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             <form method="POST" class="cliente-form">
                 <div class="form-grid">
-                    <!-- Tipo y número de documento (CORREGIDO: INE para México) -->
+                    <!-- Tipo y número de documento -->
                     <div class="form-row">
                         <div class="form-group half">
                             <label class="form-label">
@@ -90,10 +179,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 Tipo de documento
                             </label>
                             <select name="tipo_documento" class="form-select">
-                                <option value="INE">🇲🇽 INE</option>
-                                <option value="CURP">📄 CURP</option>
-                                <option value="RFC">🏢 RFC</option>
-                                <option value="PASAPORTE">🌎 Pasaporte</option>
+                                <option value="INE" <?php echo $tipo_documento == 'INE' ? 'selected' : ''; ?>>🇲🇽 INE</option>
+                                <option value="CURP" <?php echo $tipo_documento == 'CURP' ? 'selected' : ''; ?>>📄 CURP</option>
+                                <option value="RFC" <?php echo $tipo_documento == 'RFC' ? 'selected' : ''; ?>>🏢 RFC</option>
+                                <option value="PASAPORTE" <?php echo $tipo_documento == 'PASAPORTE' ? 'selected' : ''; ?>>🌎 Pasaporte</option>
                             </select>
                         </div>
                         
@@ -102,8 +191,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 Número de documento
                             </label>
                             <input type="text" name="documento" class="form-input" 
-                                   placeholder="Ej: ABCD123456" (para INE, CURP o RFC)
-                                   value="<?php echo htmlspecialchars($_POST['documento'] ?? ''); ?>">
+                                   placeholder="Ej: ABCD123456" 
+                                   value="<?php echo h($documento); ?>">
                         </div>
                     </div>
                     
@@ -116,7 +205,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </label>
                             <input type="text" name="nombre" class="form-input" required
                                    placeholder="Ej: Juan"
-                                   value="<?php echo htmlspecialchars($_POST['nombre'] ?? ''); ?>">
+                                   value="<?php echo h($nombre); ?>">
                         </div>
                         
                         <div class="form-group half">
@@ -125,7 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </label>
                             <input type="text" name="apellidos" class="form-input" 
                                    placeholder="Ej: Pérez García"
-                                   value="<?php echo htmlspecialchars($_POST['apellidos'] ?? ''); ?>">
+                                   value="<?php echo h($apellidos); ?>">
                         </div>
                     </div>
                     
@@ -138,7 +227,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </label>
                             <input type="email" name="email" class="form-input" 
                                    placeholder="cliente@ejemplo.com"
-                                   value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>">
+                                   value="<?php echo h($email); ?>">
                         </div>
                         
                         <div class="form-group half">
@@ -148,7 +237,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </label>
                             <input type="tel" name="telefono" class="form-input" 
                                    placeholder="Ej: 55-1234-5678"
-                                   value="<?php echo htmlspecialchars($_POST['telefono'] ?? ''); ?>">
+                                   value="<?php echo h($telefono); ?>">
                         </div>
                     </div>
                     
@@ -159,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             Dirección
                         </label>
                         <textarea name="direccion" class="form-textarea" rows="2" 
-                                  placeholder="Calle, número, colonia, ciudad, código postal..."><?php echo htmlspecialchars($_POST['direccion'] ?? ''); ?></textarea>
+                                  placeholder="Calle, número, colonia, ciudad, código postal..."><?php echo h($direccion); ?></textarea>
                     </div>
                     
                     <!-- Fecha de nacimiento -->
@@ -170,7 +259,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 Fecha de nacimiento
                             </label>
                             <input type="date" name="fecha_nacimiento" class="form-input" 
-                                   value="<?php echo htmlspecialchars($_POST['fecha_nacimiento'] ?? ''); ?>">
+                                   value="<?php echo h($fecha_nacimiento); ?>">
                         </div>
                     </div>
                     
@@ -181,7 +270,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             Notas adicionales
                         </label>
                         <textarea name="notas" class="form-textarea" rows="3" 
-                                  placeholder="Información relevante sobre el cliente..."><?php echo htmlspecialchars($_POST['notas'] ?? ''); ?></textarea>
+                                  placeholder="Información relevante sobre el cliente..."><?php echo h($notas); ?></textarea>
                     </div>
                 </div>
                 
@@ -197,7 +286,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         Guardar Cliente
                     </button>
                     
-                    <a href="/dashboard/clientes/index.php" class="btn-cancel">
+                    <a href="<?php echo url('dashboard/clientes/index.php'); ?>" class="btn-cancel">
                         <i class="fas fa-times"></i>
                         Cancelar
                     </a>
@@ -226,7 +315,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </style>
 
 <script>
-// Validación de email en tiempo real (opcional)
+// Validación de email en tiempo real
 document.querySelector('input[name="email"]')?.addEventListener('blur', function() {
     const email = this.value;
     if (email && !email.includes('@')) {
@@ -268,6 +357,17 @@ document.querySelector('select[name="tipo_documento"]')?.addEventListener('chang
         case 'PASAPORTE':
             inputDoc.placeholder = 'Ej: G12345678';
             break;
+    }
+});
+
+// Prevenir envío si hay errores
+document.querySelector('.cliente-form')?.addEventListener('submit', function(e) {
+    const nombre = document.querySelector('input[name="nombre"]').value.trim();
+    
+    if (!nombre) {
+        e.preventDefault();
+        alert('❌ El nombre es obligatorio');
+        return;
     }
 });
 </script>

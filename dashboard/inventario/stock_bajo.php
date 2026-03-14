@@ -1,127 +1,93 @@
 <?php
+require_once '../../config.php';
+requiereAuth();
+
+$conn = getDB();
+
+// Obtener filtros actuales
+$tipo_filtro = $_GET['tipo'] ?? 'todos';
+$categoria_filtro = isset($_GET['categoria']) ? (int)$_GET['categoria'] : 0;
+$marca_filtro = isset($_GET['marca']) ? (int)$_GET['marca'] : 0;
+
+// Construir condiciones WHERE
+$condiciones = ["p.activo = 1"];
+
+// Filtro por tipo de stock
+if ($tipo_filtro === 'bajo') {
+    $condiciones[] = "p.stock_actual <= p.stock_minimo AND p.stock_actual > 0";
+} elseif ($tipo_filtro === 'agotado') {
+    $condiciones[] = "p.stock_actual = 0";
+} else {
+    $condiciones[] = "p.stock_actual <= p.stock_minimo";
+}
+
+// Filtro por categoría
+if ($categoria_filtro > 0) {
+    $condiciones[] = "p.id_categoria = $categoria_filtro";
+}
+
+// Filtro por marca
+if ($marca_filtro > 0) {
+    $condiciones[] = "p.id_marca = $marca_filtro";
+}
+
+$where = implode(" AND ", $condiciones);
+
+// Obtener productos con stock bajo
+$sql = "
+    SELECT p.*, c.nombre as categoria_nombre, m.nombre as marca_nombre
+    FROM productos p
+    LEFT JOIN categorias c ON p.id_categoria = c.id
+    LEFT JOIN marcas m ON p.id_marca = m.id
+    WHERE $where
+    ORDER BY 
+        CASE 
+            WHEN p.stock_actual = 0 THEN 0 
+            ELSE 1 
+        END,
+        p.stock_actual ASC
+";
+
+$result = $conn->query($sql);
+$productos = [];
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
+        $productos[] = $row;
+    }
+}
+
+// Obtener categorías para filtros
+$categorias = [];
+$result = $conn->query("SELECT id, nombre FROM categorias WHERE activo = 1 ORDER BY nombre");
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
+        $categorias[] = $row;
+    }
+}
+
+// Obtener marcas para filtros
+$marcas = [];
+$result = $conn->query("SELECT id, nombre FROM marcas WHERE activo = 1 ORDER BY nombre");
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
+        $marcas[] = $row;
+    }
+}
+
+// Contar estadísticas totales (sin filtros)
+$stats_sql = "
+    SELECT 
+        SUM(CASE WHEN stock_actual <= stock_minimo AND stock_actual > 0 THEN 1 ELSE 0 END) as total_bajos,
+        SUM(CASE WHEN stock_actual = 0 THEN 1 ELSE 0 END) as total_agotados
+    FROM productos 
+    WHERE activo = 1
+";
+$stats_result = $conn->query($stats_sql);
+$stats = $stats_result->fetch_assoc();
+$total_bajos = $stats['total_bajos'] ?? 0;
+$total_agotados = $stats['total_agotados'] ?? 0;
+
 include '../header.php';
-
-// Datos de ejemplo para productos con stock bajo
-$productos = [
-    [
-        'id' => 1,
-        'nombre' => 'Martillo de Uña 16oz',
-        'codigo_barras' => '750123456789',
-        'categoria' => 'Herramientas Manuales',
-        'marca' => 'Truper',
-        'stock_actual' => 2,
-        'stock_minimo' => 5
-    ],
-    [
-        'id' => 2,
-        'nombre' => 'Taladro Percutor 500W',
-        'codigo_barras' => '750123456788',
-        'categoria' => 'Herramientas Eléctricas',
-        'marca' => 'Bosch',
-        'stock_actual' => 1,
-        'stock_minimo' => 3
-    ],
-    [
-        'id' => 3,
-        'nombre' => 'Caja de Tornillos 1/2" x 100pz',
-        'codigo_barras' => '750123456787',
-        'categoria' => 'Ferretería General',
-        'marca' => 'Pretul',
-        'stock_actual' => 0,
-        'stock_minimo' => 10
-    ],
-    [
-        'id' => 4,
-        'nombre' => 'Cemento Portland Gris 50kg',
-        'codigo_barras' => '750123456786',
-        'categoria' => 'Materiales Construcción',
-        'marca' => 'Cruz Azul',
-        'stock_actual' => 3,
-        'stock_minimo' => 8
-    ],
-    [
-        'id' => 5,
-        'nombre' => 'Pintura Blanca 20L',
-        'codigo_barras' => '750123456785',
-        'categoria' => 'Pinturas',
-        'marca' => 'Comex',
-        'stock_actual' => 0,
-        'stock_minimo' => 5
-    ],
-    [
-        'id' => 6,
-        'nombre' => 'Cable Eléctrico Calibre 12',
-        'codigo_barras' => '750123456784',
-        'categoria' => 'Electricidad',
-        'marca' => 'Volteck',
-        'stock_actual' => 4,
-        'stock_minimo' => 6
-    ],
-    [
-        'id' => 7,
-        'nombre' => 'Disco de Corte 7"',
-        'codigo_barras' => '750123456783',
-        'categoria' => 'Herramientas Eléctricas',
-        'marca' => 'Stanley',
-        'stock_actual' => 2,
-        'stock_minimo' => 10
-    ],
-    [
-        'id' => 8,
-        'nombre' => 'Guantes de Seguridad Talla M',
-        'codigo_barras' => '750123456782',
-        'categoria' => 'Seguridad Industrial',
-        'marca' => '3M',
-        'stock_actual' => 0,
-        'stock_minimo' => 15
-    ]
-];
-
-// Datos para filtros
-$categorias = [
-    ['id' => 1, 'nombre' => 'Herramientas Manuales'],
-    ['id' => 2, 'nombre' => 'Herramientas Eléctricas'],
-    ['id' => 3, 'nombre' => 'Materiales Construcción'],
-    ['id' => 4, 'nombre' => 'Ferretería General'],
-    ['id' => 5, 'nombre' => 'Pinturas'],
-    ['id' => 6, 'nombre' => 'Electricidad'],
-    ['id' => 7, 'nombre' => 'Seguridad Industrial']
-];
-
-$marcas = [
-    ['id' => 1, 'nombre' => 'Truper'],
-    ['id' => 2, 'nombre' => 'Pretul'],
-    ['id' => 3, 'nombre' => 'Bosch'],
-    ['id' => 4, 'nombre' => 'Stanley'],
-    ['id' => 5, 'nombre' => 'Comex'],
-    ['id' => 6, 'nombre' => 'Cruz Azul'],
-    ['id' => 7, 'nombre' => 'Volteck'],
-    ['id' => 8, 'nombre' => '3M']
-];
-
-// Obtener filtros actuales (simulados)
-$tipo_actual = $_GET['tipo'] ?? 'todos';
-$categoria_actual = $_GET['categoria'] ?? '';
-$marca_actual = $_GET['marca'] ?? '';
-
-// Filtrar productos según los filtros (simulación)
-$productos_filtrados = array_filter($productos, function($p) use ($tipo_actual, $categoria_actual, $marca_actual) {
-    // Filtro por tipo
-    if ($tipo_actual == 'bajo' && $p['stock_actual'] == 0) return false;
-    if ($tipo_actual == 'agotado' && $p['stock_actual'] > 0) return false;
-    
-    // Filtro por categoría
-    if (!empty($categoria_actual) && strpos($p['categoria'], $categoria_actual) === false) return false;
-    
-    // Filtro por marca
-    if (!empty($marca_actual) && strpos($p['marca'], $marca_actual) === false) return false;
-    
-    return true;
-});
-
-// Contar estadísticas
-$total_agotados = count(array_filter($productos, function($p) { return $p['stock_actual'] == 0; }));
-$total_bajos = count(array_filter($productos, function($p) { return $p['stock_actual'] > 0 && $p['stock_actual'] <= $p['stock_minimo']; }));
 ?>
 
 <!-- Header de la página -->
@@ -135,7 +101,7 @@ $total_bajos = count(array_filter($productos, function($p) { return $p['stock_ac
     </div>
     
     <div class="pv-header-right">
-        <a href="/dashboard/inventario/index.php" class="btn-header" style="text-decoration: none;">
+        <a href="<?php echo url('dashboard/inventario/index.php'); ?>" class="btn-header" style="text-decoration: none;">
             <i class="fas fa-arrow-left"></i>
             Volver a Inventario
         </a>
@@ -148,17 +114,17 @@ $total_bajos = count(array_filter($productos, function($p) { return $p['stock_ac
         <div class="filtros-grid" style="grid-template-columns: repeat(5, 1fr);">
             <!-- Tipo de filtro -->
             <select name="tipo" class="filtro-select">
-                <option value="todos" <?php echo $tipo_actual == 'todos' ? 'selected' : ''; ?>>📋 Todos (Bajo y Agotado)</option>
-                <option value="bajo" <?php echo $tipo_actual == 'bajo' ? 'selected' : ''; ?>>⚠️ Stock Bajo</option>
-                <option value="agotado" <?php echo $tipo_actual == 'agotado' ? 'selected' : ''; ?>>❌ Agotados</option>
+                <option value="todos" <?php echo $tipo_filtro == 'todos' ? 'selected' : ''; ?>>📋 Todos (Bajo y Agotado)</option>
+                <option value="bajo" <?php echo $tipo_filtro == 'bajo' ? 'selected' : ''; ?>>⚠️ Stock Bajo</option>
+                <option value="agotado" <?php echo $tipo_filtro == 'agotado' ? 'selected' : ''; ?>>❌ Agotados</option>
             </select>
             
             <!-- Categorías -->
             <select name="categoria" class="filtro-select">
                 <option value="">📂 Todas las categorías</option>
                 <?php foreach ($categorias as $cat): ?>
-                    <option value="<?php echo $cat['nombre']; ?>" <?php echo $categoria_actual == $cat['nombre'] ? 'selected' : ''; ?>>
-                        <?php echo $cat['nombre']; ?>
+                    <option value="<?php echo $cat['id']; ?>" <?php echo $categoria_filtro == $cat['id'] ? 'selected' : ''; ?>>
+                        <?php echo h($cat['nombre']); ?>
                     </option>
                 <?php endforeach; ?>
             </select>
@@ -167,8 +133,8 @@ $total_bajos = count(array_filter($productos, function($p) { return $p['stock_ac
             <select name="marca" class="filtro-select">
                 <option value="">🏷️ Todas las marcas</option>
                 <?php foreach ($marcas as $m): ?>
-                    <option value="<?php echo $m['nombre']; ?>" <?php echo $marca_actual == $m['nombre'] ? 'selected' : ''; ?>>
-                        <?php echo $m['nombre']; ?>
+                    <option value="<?php echo $m['id']; ?>" <?php echo $marca_filtro == $m['id'] ? 'selected' : ''; ?>>
+                        <?php echo h($m['nombre']); ?>
                     </option>
                 <?php endforeach; ?>
             </select>
@@ -180,7 +146,7 @@ $total_bajos = count(array_filter($productos, function($p) { return $p['stock_ac
             </button>
             
             <!-- Botón limpiar -->
-            <a href="/dashboard/inventario/stock_bajo.php" class="btn-filtro btn-secondary" style="text-decoration: none; text-align: center;">
+            <a href="<?php echo url('dashboard/inventario/stock_bajo.php'); ?>" class="btn-filtro btn-secondary" style="text-decoration: none; text-align: center;">
                 <i class="fas fa-times"></i>
                 Limpiar
             </a>
@@ -204,17 +170,18 @@ $total_bajos = count(array_filter($productos, function($p) { return $p['stock_ac
                 </tr>
             </thead>
             <tbody>
-                <?php if (count($productos_filtrados) > 0): ?>
-                    <?php foreach ($productos_filtrados as $p): ?>
+                <?php if (count($productos) > 0): ?>
+                    <?php foreach ($productos as $p): ?>
                     <tr class="fila-producto-stock">
                         <td class="col-producto">
                             <div class="producto-info">
-                                <span class="producto-nombre"><?php echo $p['nombre']; ?></span>
-                                <span class="producto-codigo"><?php echo $p['codigo_barras']; ?></span>
+                                <span class="producto-nombre"><?php echo h($p['nombre']); ?></span>
+                                <span class="producto-codigo"><?php echo $p['codigo_barras'] ?: '—'; ?></span>
+                                <small class="producto-sku">SKU: <?php echo h($p['sku']); ?></small>
                             </div>
                         </td>
-                        <td class="col-categoria"><?php echo $p['categoria']; ?></td>
-                        <td class="col-marca"><?php echo $p['marca']; ?></td>
+                        <td class="col-categoria"><?php echo $p['categoria_nombre'] ?: '—'; ?></td>
+                        <td class="col-marca"><?php echo $p['marca_nombre'] ?: '—'; ?></td>
                         <td class="text-center">
                             <span class="stock-actual <?php echo $p['stock_actual'] == 0 ? 'agotado' : 'bajo'; ?>">
                                 <?php echo $p['stock_actual']; ?>
@@ -236,11 +203,11 @@ $total_bajos = count(array_filter($productos, function($p) { return $p['stock_ac
                         </td>
                         <td class="col-acciones">
                             <div class="acciones-wrapper">
-                                <a href="/dashboard/productos/ver.php?id=<?php echo $p['id']; ?>" 
+                                <a href="<?php echo url('dashboard/productos/ver.php?id=' . $p['id']); ?>" 
                                    class="accion-icon" title="Ver producto">
                                     <i class="fas fa-eye"></i>
                                 </a>
-                                <a href="/dashboard/productos/ajustar_stock.php?id=<?php echo $p['id']; ?>" 
+                                <a href="<?php echo url('dashboard/productos/ajustar_stock.php?id=' . $p['id']); ?>" 
                                    class="accion-icon" title="Ajustar stock">
                                     <i class="fas fa-cubes"></i>
                                 </a>
@@ -256,7 +223,7 @@ $total_bajos = count(array_filter($productos, function($p) { return $p['stock_ac
                             </div>
                             <h3>¡Excelente!</h3>
                             <p>No hay productos con problemas de stock</p>
-                            <a href="/dashboard/inventario/index.php" class="btn-primary" style="margin-top: 1rem; display: inline-block;">
+                            <a href="<?php echo url('dashboard/inventario/index.php'); ?>" class="btn-primary" style="margin-top: 1rem; display: inline-block;">
                                 <i class="fas fa-arrow-left"></i>
                                 Volver al inventario
                             </a>
@@ -268,12 +235,12 @@ $total_bajos = count(array_filter($productos, function($p) { return $p['stock_ac
     </div>
     
     <!-- Resumen -->
-    <?php if (count($productos_filtrados) > 0): ?>
+    <?php if (count($productos) > 0): ?>
     <div class="tabla-footer">
         <div class="resumen-wrapper">
             <p class="resumen-info">
                 <i class="fas fa-boxes"></i>
-                Mostrando: <strong><?php echo count($productos_filtrados); ?></strong> productos
+                Mostrando: <strong><?php echo count($productos); ?></strong> productos
             </p>
             <div class="resumen-stats">
                 <span class="stat-badge bajo">
@@ -305,6 +272,14 @@ $total_bajos = count(array_filter($productos, function($p) { return $p['stock_ac
 
 .fila-producto-stock {
     animation: fadeInRow 0.3s ease-out forwards;
+}
+
+/* Estilos adicionales */
+.producto-info small {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--gray-500);
+    margin-top: 0.2rem;
 }
 
 .fila-producto-stock:nth-child(1) { animation-delay: 0.02s; }
