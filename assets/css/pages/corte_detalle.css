@@ -1,0 +1,519 @@
+/* ========================================
+   CORTE_DETALLE.CSS - DETALLE DE CORTE DE CAJA
+   ======================================== */
+
+/* ===== HEADER DE LA PÁGINA (REUTILIZADO) ===== */
+.pv-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.pv-header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.pv-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.pv-logo i {
+    font-size: 1.5rem;
+    color: var(--primary);
+    background: var(--primary-alpha);
+    padding: 0.5rem;
+    border-radius: var(--radius-md);
+}
+
+.pv-logo h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin: 0;
+}
+
+.pv-badge {
+    display: inline-block;
+    padding: 0.25rem 1rem;
+    background: linear-gradient(135deg, var(--primary-alpha) 0%, var(--secondary-alpha) 100%);
+    color: var(--primary);
+    border-radius: var(--radius-lg);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 1px solid var(--primary-light);
+}
+
+.pv-header-right {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.btn-header {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 0.6rem 1.2rem;
+    color: var(--gray-700);
+    font-weight: 500;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.btn-header:hover {
+    background: var(--gray-50);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* ===== HEADER DE INFORMACIÓN DEL CORTE ===== */
+.corte-detalle-header {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.corte-detalle-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    align-items: center;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.info-item i {
+    color: var(--primary);
+    font-size: 1rem;
+}
+
+.info-label {
+    color: var(--gray-500);
+    font-weight: 500;
+}
+
+.info-valor {
+    color: var(--gray-800);
+    font-weight: 600;
+}
+
+.info-hora {
+    color: var(--gray-400);
+    font-size: 0.8rem;
+    margin-left: 0.25rem;
+}
+
+/* ===== GRID PRINCIPAL ===== */
+.corte-detalle-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* ===== CARDS DE DETALLE ===== */
+.detalle-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.card-header {
+    padding: 1rem 1.25rem;
+    background: linear-gradient(135deg, var(--primary-alpha) 0%, var(--secondary-alpha) 100%);
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-header i {
+    color: var(--primary);
+    font-size: 1rem;
+}
+
+.card-header h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin: 0;
+}
+
+.card-content {
+    padding: 1.25rem;
+}
+
+/* ===== FILAS DE MONTOS ===== */
+.monto-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    font-size: 0.95rem;
+}
+
+.monto-label {
+    color: var(--gray-500);
+}
+
+.monto-valor {
+    font-weight: 600;
+    color: var(--gray-800);
+}
+
+.monto-valor.efectivo {
+    color: var(--success);
+}
+
+.monto-valor.esperado {
+    color: var(--info);
+}
+
+.monto-valor.final {
+    color: var(--primary);
+    font-size: 1.1rem;
+}
+
+.total-parcial {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--gray-200);
+}
+
+.divisor {
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--gray-200), transparent);
+    margin: 1rem 0;
+}
+
+/* ===== DIFERENCIA ===== */
+.diferencia-box {
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    border-radius: var(--radius-md);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.diferencia-box.positiva {
+    background: linear-gradient(135deg, var(--success-light) 0%, #a7f3d0 100%);
+    border: 1px solid #6ee7b7;
+}
+
+.diferencia-box.negativa {
+    background: linear-gradient(135deg, var(--danger-light) 0%, #fee2e2 100%);
+    border: 1px solid #fecaca;
+}
+
+.diferencia-box.cero {
+    background: linear-gradient(135deg, var(--gray-100) 0%, var(--gray-200) 100%);
+    border: 1px solid var(--gray-300);
+}
+
+.diferencia-label {
+    font-weight: 500;
+    color: var(--gray-700);
+}
+
+.diferencia-valor {
+    font-weight: 700;
+}
+
+.diferencia-box.positiva .diferencia-valor {
+    color: var(--success);
+}
+
+.diferencia-box.negativa .diferencia-valor {
+    color: var(--danger);
+}
+
+/* ===== MÉTODOS DE PAGO ===== */
+.metodo-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background-color: var(--gray-50);
+    border-radius: var(--radius-md);
+}
+
+.metodo-icono {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+
+.metodo-icono.efectivo {
+    background: linear-gradient(135deg, var(--success-light) 0%, #a7f3d0 100%);
+    color: var(--success);
+}
+
+.metodo-icono.tarjeta {
+    background: linear-gradient(135deg, var(--info-light) 0%, #bfdbfe 100%);
+    color: var(--info);
+}
+
+.metodo-icono.transferencia {
+    background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+    color: #8b5cf6;
+}
+
+.metodo-info {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.metodo-label {
+    font-weight: 500;
+    color: var(--gray-700);
+}
+
+.metodo-monto {
+    font-weight: 600;
+    color: var(--gray-800);
+}
+
+.total-ventas {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, var(--primary-alpha) 0%, var(--secondary-alpha) 100%);
+    border-radius: var(--radius-md);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.total-label {
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.total-valor {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+/* ===== OBSERVACIONES ===== */
+.observaciones-card {
+    margin-bottom: 1.5rem;
+}
+
+.observacion-texto {
+    color: var(--gray-700);
+    line-height: 1.6;
+    margin: 0;
+}
+
+.motivo-diferencia {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: var(--warning-light);
+    border-left: 4px solid var(--warning);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.motivo-diferencia p {
+    margin: 0;
+    color: var(--gray-700);
+    flex: 1;
+}
+
+.motivo-diferencia strong {
+    color: var(--warning);
+}
+
+/* ===== TABLA DE VENTAS ===== */
+.ventas-card {
+    margin-top: 1.5rem;
+}
+
+.tabla-ventas-corte {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.tabla-ventas-corte th {
+    background-color: var(--gray-100);
+    color: var(--gray-600);
+    font-weight: 600;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 2px solid var(--gray-300);
+}
+
+.tabla-ventas-corte td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--gray-200);
+    color: var(--gray-700);
+}
+
+.tabla-ventas-corte tbody tr:hover {
+    background-color: var(--gray-50);
+}
+
+.folio-cell {
+    font-family: monospace;
+    color: var(--primary);
+    font-weight: 500;
+}
+
+.hora-cell {
+    color: var(--gray-600);
+}
+
+.metodo-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-lg);
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.metodo-badge.efectivo {
+    background: linear-gradient(135deg, var(--success-light) 0%, #a7f3d0 100%);
+    color: var(--success);
+    border: 1px solid #6ee7b7;
+}
+
+.metodo-badge.tarjeta {
+    background: linear-gradient(135deg, var(--info-light) 0%, #bfdbfe 100%);
+    color: var(--info);
+    border: 1px solid #93c5fd;
+}
+
+.metodo-badge.transferencia {
+    background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+    color: #8b5cf6;
+    border: 1px solid #c084fc;
+}
+
+.total-cell {
+    font-weight: 600;
+    color: var(--success);
+    text-align: right;
+}
+
+.accion-icon {
+    width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    color: var(--gray-400);
+    transition: all 0.2s;
+    text-decoration: none;
+    background: white;
+    border: 1px solid var(--gray-200);
+}
+
+.accion-icon:hover {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: white;
+    border-color: transparent;
+    transform: scale(1.1);
+}
+
+.empty-message {
+    text-align: center;
+    padding: 2rem;
+    color: var(--gray-500);
+    margin: 0;
+}
+
+/* ===== UTILIDADES ===== */
+.text-right {
+    text-align: right;
+}
+
+.text-center {
+    text-align: center;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 1024px) {
+    .corte-detalle-info {
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .pv-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .pv-header-right {
+        width: 100%;
+    }
+    
+    .btn-header {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .corte-detalle-info {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .info-item {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+    
+    .corte-detalle-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .metodo-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+    
+    .tabla-ventas-corte {
+        min-width: 600px;
+    }
+}

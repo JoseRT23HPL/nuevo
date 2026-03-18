@@ -95,14 +95,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ");
         
         if ($stmt) {
-            // Cambia de 11 parámetros a 10 parámetros
             $stmt->bind_param(
-                "sdddddissi",  // 10 caracteres: s, d, d, d, d, d, i, s, s, i
+                "sdddddissi",
                 $tipo_cierre,
                 $monto_final,
                 $ventas_turno['total_ingresos'],
                 $ventas_turno['efectivo'],
-                $ventas_turno['transferencia'],  // Solo transferencia, sin tarjeta
+                $ventas_turno['transferencia'],
                 $diferencia,
                 $diferencia_justificada,
                 $motivo_diferencia,
@@ -130,20 +129,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if ($monto_retiro <= 0) {
             $error = 'El monto a retirar debe ser mayor a cero';
-        } elseif ($monto_retiro > $corte_abierto['monto_inicial'] + $ventas_turno['efectivo']) {
-            $error = 'No hay suficiente efectivo en caja';
         } else {
-            // Registrar retiro parcial
+            // Obtener ventas del turno para validar
             $stmt = $conn->prepare("
-                INSERT INTO retiros_caja (id_corte, monto, motivo, id_usuario) 
-                VALUES (?, ?, ?, ?)
+                SELECT COALESCE(SUM(CASE WHEN metodo_pago = 'efectivo' THEN total ELSE 0 END), 0) as efectivo
+                FROM ventas 
+                WHERE fecha_venta >= ?
             ");
-            $stmt->bind_param("idsi", $corte_abierto['id'], $monto_retiro, $motivo_retiro, $_SESSION['user_id']);
+            $stmt->bind_param("s", $corte_abierto['fecha_apertura']);
+            $stmt->execute();
+            $ventas_efectivo = $stmt->get_result()->fetch_assoc()['efectivo'];
             
-            if ($stmt->execute()) {
-                $success = 'Retiro registrado correctamente';
+            $efectivo_disponible = $corte_abierto['monto_inicial'] + $ventas_efectivo;
+            
+            if ($monto_retiro > $efectivo_disponible) {
+                $error = 'No hay suficiente efectivo en caja';
             } else {
-                $error = 'Error al registrar retiro';
+                // Registrar retiro parcial
+                $stmt = $conn->prepare("
+                    INSERT INTO retiros_caja (id_corte, monto, motivo, id_usuario) 
+                    VALUES (?, ?, ?, ?)
+                ");
+                $stmt->bind_param("idsi", $corte_abierto['id'], $monto_retiro, $motivo_retiro, $_SESSION['user_id']);
+                
+                if ($stmt->execute()) {
+                    $success = 'Retiro registrado correctamente';
+                } else {
+                    $error = 'Error al registrar retiro';
+                }
             }
         }
     }
@@ -557,7 +570,7 @@ include '../header.php';
 
 <script>
 function calcularDiferencia(montoFinal) {
-    const totalEsperado = <?php echo $total_esperado; ?>;
+    const totalEsperado = <?php echo isset($total_esperado) ? $total_esperado : 0; ?>;
     const diferencia = parseFloat(montoFinal) - totalEsperado;
     const container = document.getElementById('diferencia-container');
     
@@ -569,7 +582,7 @@ function calcularDiferencia(montoFinal) {
 }
 
 function calcularDiferenciaConciliacion(montoFinal) {
-    const totalEsperado = <?php echo $total_esperado; ?>;
+    const totalEsperado = <?php echo isset($total_esperado) ? $total_esperado : 0; ?>;
     const diferencia = parseFloat(montoFinal) - totalEsperado;
     const preview = document.getElementById('diferencia-preview');
     

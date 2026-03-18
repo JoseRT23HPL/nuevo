@@ -5,6 +5,7 @@ function getPageCss($uri, $version) {
     
     $pageMappings = [
         'dashboard/index.php' => 'dashboard.css',
+        'dashboard/ayuda.php' => 'ayuda.css',
         'ventas/index.php' => 'ventas.css',
         'ventas/historial.php' => 'historial.css',
         'productos/index.php' => 'productos.css',
@@ -32,7 +33,11 @@ function getPageCss($uri, $version) {
         'usuarios/ver.php' => 'usuarios.css', 
         'usuarios/cambiar_password.php' => 'usuarios.css',     
         'reportes/index.php' => 'reportes.css',
-        'reportes/historial_cortes.php' => 'historial_cortes.css',      
+        'reportes/historial_cortes.php' => 'historial_cortes.css',
+        'reportes/corte_detalle.php' => 'corte_detalle.css',
+        'reportes/productos_mas_vendidos.php' => 'productos_mas_vendidos.css',  
+        'reportes/eliminar_corte.php' => 'eliminar_corte.css',
+        'reportes/ventas.php' => 'reporte-ventas.css',    
     ];
     
     foreach ($pageMappings as $pattern => $cssFile) {

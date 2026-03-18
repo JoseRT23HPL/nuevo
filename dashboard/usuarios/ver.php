@@ -191,7 +191,7 @@ include '../header.php';
                 ?>
             </div>
             <div class="usuario-perfil-info">
-                <h2 class="usuario-perfil-nombre"><?php echo htmlspecialchars(!empty($nombre_completo) ? $nombre_completo : $username); ?></h2>
+                <h2 class="usuario-perfil-nombre"><?php echo htmlspecialchars(!empty($nombre) ? $nombre : $username); ?></h2>
                 <p class="usuario-perfil-username">@<?php echo htmlspecialchars($username); ?></p>
                 
                 <div class="usuario-perfil-badges">

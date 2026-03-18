@@ -1,66 +1,120 @@
 <?php
-// file: /dashboard/reportes/index.php - VERSIÓN CSS PURO (SIN BACKEND)
-include '../header.php';
+// file: /dashboard/reportes/index.php - VERSIÓN CONECTADA A BD Y CORREGIDA
+require_once '../../config.php';
+requiereAuth();
 
-// Datos de ejemplo para mostrar
+$conn = getDB();
+
+// Obtener el usuario actual
+$usuario_actual = getCurrentUser();
+
+// Definir fechas
 $hoy = date('Y-m-d');
 $inicio_semana = date('Y-m-d', strtotime('monday this week'));
 $inicio_mes = date('Y-m-01');
 
-// Ventas de hoy (ejemplo)
-$ventas_hoy = [
-    'total_ventas' => 12,
-    'total_ingresos' => 3560.50,
-    'efectivo' => 2140.00,
-    'tarjeta' => 950.50,
-    'transferencia' => 470.00
-];
+// ===== 1. VENTAS DE HOY =====
+$stmt = $conn->prepare("
+    SELECT 
+        COUNT(*) as total_ventas,
+        COALESCE(SUM(total), 0) as total_ingresos,
+        COALESCE(SUM(CASE WHEN metodo_pago = 'efectivo' THEN total ELSE 0 END), 0) as efectivo,
+        COALESCE(SUM(CASE WHEN metodo_pago = 'transferencia' THEN total ELSE 0 END), 0) as transferencia
+    FROM ventas 
+    WHERE DATE(fecha_venta) = ? AND estado = 'completada'
+");
+$stmt->bind_param("s", $hoy);
+$stmt->execute();
+$ventas_hoy = $stmt->get_result()->fetch_assoc();
 
-// Ventas de la semana (ejemplo)
-$ventas_semana = [
-    'total_ventas' => 58,
-    'total_ingresos' => 15780.25
-];
+// ===== 2. VENTAS DE LA SEMANA =====
+$stmt = $conn->prepare("
+    SELECT 
+        COUNT(*) as total_ventas,
+        COALESCE(SUM(total), 0) as total_ingresos
+    FROM ventas 
+    WHERE DATE(fecha_venta) >= ? AND estado = 'completada'
+");
+$stmt->bind_param("s", $inicio_semana);
+$stmt->execute();
+$ventas_semana = $stmt->get_result()->fetch_assoc();
 
-// Ventas del mes (ejemplo)
-$ventas_mes = [
-    'total_ventas' => 187,
-    'total_ingresos' => 52340.80
-];
+// ===== 3. VENTAS DEL MES =====
+$stmt = $conn->prepare("
+    SELECT 
+        COUNT(*) as total_ventas,
+        COALESCE(SUM(total), 0) as total_ingresos
+    FROM ventas 
+    WHERE DATE(fecha_venta) >= ? AND estado = 'completada'
+");
+$stmt->bind_param("s", $inicio_mes);
+$stmt->execute();
+$ventas_mes = $stmt->get_result()->fetch_assoc();
 
-// Productos más vendidos (ejemplo)
-$productos_top = [
-    ['nombre' => 'Martillo de Uña 16oz', 'imagen' => '', 'total_vendido' => 45, 'total_ingresos' => 1125.00],
-    ['nombre' => 'Taladro Percutor 500W', 'imagen' => '', 'total_vendido' => 23, 'total_ingresos' => 8970.00],
-    ['nombre' => 'Caja de Tornillos 1/2" x 100pz', 'imagen' => '', 'total_vendido' => 120, 'total_ingresos' => 1800.00],
-    ['nombre' => 'Cemento Portland Gris 50kg', 'imagen' => '', 'total_vendido' => 85, 'total_ingresos' => 17000.00],
-    ['nombre' => 'Pintura Blanca 20L', 'imagen' => '', 'total_vendido' => 32, 'total_ingresos' => 4480.00]
-];
+// ===== 4. PRODUCTOS MÁS VENDIDOS (TOP 5) =====
+$productos_top = $conn->query("
+    SELECT 
+        p.id,
+        p.nombre,
+        p.imagen_url,
+        COALESCE(SUM(dv.cantidad), 0) as total_vendido,
+        COALESCE(SUM(dv.subtotal), 0) as total_ingresos
+    FROM productos p
+    INNER JOIN detalle_ventas dv ON p.id = dv.id_producto
+    INNER JOIN ventas v ON dv.id_venta = v.id
+    WHERE v.estado = 'completada'
+        AND v.fecha_venta >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+    GROUP BY p.id, p.nombre, p.imagen_url
+    ORDER BY total_vendido DESC
+    LIMIT 5
+");
 
-// Datos para el gráfico (últimos 7 días)
+// ===== 5. DATOS PARA EL GRÁFICO (ÚLTIMOS 7 DÍAS) =====
 $fechas = [];
 $totales = [];
 
 for ($i = 6; $i >= 0; $i--) {
-    $fecha = date('d/m', strtotime("-$i days"));
-    $fechas[] = $fecha;
-    $totales[] = rand(1500, 5000); // Valores aleatorios para ejemplo
+    $fecha = date('Y-m-d', strtotime("-$i days"));
+    $fecha_label = date('d/m', strtotime($fecha));
+    $fechas[] = $fecha_label;
+    
+    $stmt = $conn->prepare("
+        SELECT COALESCE(SUM(total), 0) as total
+        FROM ventas 
+        WHERE DATE(fecha_venta) = ? AND estado = 'completada'
+    ");
+    $stmt->bind_param("s", $fecha);
+    $stmt->execute();
+    $total = $stmt->get_result()->fetch_assoc()['total'];
+    
+    $totales[] = (float)$total;
 }
 
-// Últimos cortes de caja (ejemplo)
-$ultimos_cortes = [
-    ['fecha_cierre' => '2025-03-14 19:30:00', 'username' => 'admin', 'monto_final' => 8750.50, 'ventas_totales' => 24],
-    ['fecha_cierre' => '2025-03-13 19:15:00', 'username' => 'jperez', 'monto_final' => 6230.00, 'ventas_totales' => 18],
-    ['fecha_cierre' => '2025-03-12 19:45:00', 'username' => 'mgarcia', 'monto_final' => 11250.75, 'ventas_totales' => 31],
-    ['fecha_cierre' => '2025-03-11 19:20:00', 'username' => 'admin', 'monto_final' => 4980.25, 'ventas_totales' => 14],
-    ['fecha_cierre' => '2025-03-10 19:00:00', 'username' => 'jperez', 'monto_final' => 7340.00, 'ventas_totales' => 22]
-];
+// ===== 6. ÚLTIMOS CORTES DE CAJA =====
+$ultimos_cortes = $conn->query("
+    SELECT 
+        c.*,
+        u.username
+    FROM cortes_caja c
+    JOIN usuarios u ON c.id_usuario = u.id
+    WHERE c.fecha_cierre IS NOT NULL
+    ORDER BY c.fecha_cierre DESC
+    LIMIT 5
+");
 
-// Verificar si hay corte abierto (ejemplo)
-$corte_abierto = true; // Cambiar a false para probar el otro estado
+// ===== 7. VERIFICAR SI HAY CORTE ABIERTO =====
+$stmt = $conn->prepare("
+    SELECT id FROM cortes_caja 
+    WHERE id_usuario = ? AND fecha_cierre IS NULL
+");
+$stmt->bind_param("i", $_SESSION['user_id']);
+$stmt->execute();
+$corte_abierto = $stmt->get_result()->num_rows > 0;
+
+include '../header.php';
 ?>
 
-<!-- HEADER UNIFICADO - CORREGIDO -->
+<!-- HEADER UNIFICADO -->
 <div class="pv-header">
     <div class="pv-header-left">
         <div class="pv-logo">
@@ -72,7 +126,7 @@ $corte_abierto = true; // Cambiar a false para probar el otro estado
     
     <div class="pv-header-right">
         <?php if ($corte_abierto): ?>
-            <a href="corte_caja.php?action=cerrar" class="btn-header warning">
+            <a href="corte_caja.php" class="btn-header warning">
                 <i class="fas fa-cash-register"></i>
                 Cerrar Corte
             </a>
@@ -89,8 +143,11 @@ $corte_abierto = true; // Cambiar a false para probar el otro estado
     </div>
 </div>
 
-<!-- Subtítulo -->
-<p class="page-subtitle">Visualiza el rendimiento de tu negocio</p>
+<!-- Subtítulo con nombre personalizado -->
+<p class="page-subtitle">
+    Hola <?php echo h($usuario_actual['nombre'] ?? $usuario_actual['username']); ?>, 
+    aquí tienes el rendimiento de tu negocio
+</p>
 
 <!-- Resumen de ventas -->
 <div class="reportes-grid">
@@ -102,23 +159,25 @@ $corte_abierto = true; // Cambiar a false para probar el otro estado
             </div>
             <div class="reporte-info">
                 <span class="reporte-label">Ventas de Hoy</span>
-                <span class="reporte-valor">$<?php echo number_format($ventas_hoy['total_ingresos'], 2); ?></span>
-                <span class="reporte-sub"><?php echo $ventas_hoy['total_ventas']; ?> ventas</span>
+                <span class="reporte-valor">$<?php echo number_format($ventas_hoy['total_ingresos'] ?? 0, 2); ?></span>
+                <span class="reporte-sub"><?php echo $ventas_hoy['total_ventas'] ?? 0; ?> ventas</span>
             </div>
         </div>
         <div class="reporte-detalles">
             <div class="detalle-item">
                 <span class="detalle-label">Efectivo</span>
-                <span class="detalle-valor">$<?php echo number_format($ventas_hoy['efectivo'], 0); ?></span>
+                <span class="detalle-valor">$<?php echo number_format($ventas_hoy['efectivo'] ?? 0, 0); ?></span>
             </div>
             <div class="detalle-item">
-                <span class="detalle-label">Tarjeta</span>
-                <span class="detalle-valor">$<?php echo number_format($ventas_hoy['tarjeta'], 0); ?></span>
+                <span class="detalle-label">Transferencia</span>
+                <span class="detalle-valor">$<?php echo number_format($ventas_hoy['transferencia'] ?? 0, 0); ?></span>
             </div>
+            <?php if (($ventas_hoy['total_ingresos'] ?? 0) > 0): ?>
             <div class="detalle-item">
-                <span class="detalle-label">Transfer</span>
-                <span class="detalle-valor">$<?php echo number_format($ventas_hoy['transferencia'], 0); ?></span>
+                <span class="detalle-label">Ticket prom.</span>
+                <span class="detalle-valor">$<?php echo number_format(($ventas_hoy['total_ingresos'] / $ventas_hoy['total_ventas']), 2); ?></span>
             </div>
+            <?php endif; ?>
         </div>
     </div>
     
@@ -130,8 +189,8 @@ $corte_abierto = true; // Cambiar a false para probar el otro estado
             </div>
             <div class="reporte-info">
                 <span class="reporte-label">Esta Semana</span>
-                <span class="reporte-valor">$<?php echo number_format($ventas_semana['total_ingresos'], 2); ?></span>
-                <span class="reporte-sub"><?php echo $ventas_semana['total_ventas']; ?> ventas</span>
+                <span class="reporte-valor">$<?php echo number_format($ventas_semana['total_ingresos'] ?? 0, 2); ?></span>
+                <span class="reporte-sub"><?php echo $ventas_semana['total_ventas'] ?? 0; ?> ventas</span>
             </div>
         </div>
         <div class="reporte-periodo">
@@ -149,12 +208,12 @@ $corte_abierto = true; // Cambiar a false para probar el otro estado
             </div>
             <div class="reporte-info">
                 <span class="reporte-label">Este Mes</span>
-                <span class="reporte-valor">$<?php echo number_format($ventas_mes['total_ingresos'], 2); ?></span>
-                <span class="reporte-sub"><?php echo $ventas_mes['total_ventas']; ?> ventas</span>
+                <span class="reporte-valor">$<?php echo number_format($ventas_mes['total_ingresos'] ?? 0, 2); ?></span>
+                <span class="reporte-sub"><?php echo $ventas_mes['total_ventas'] ?? 0; ?> ventas</span>
             </div>
         </div>
         <div class="reporte-periodo">
-            <span class="periodo-texto"><?php echo date('F Y'); ?></span>
+            <span class="periodo-texto"><?php echo strftime('%B %Y'); ?></span>
         </div>
     </div>
 </div>
@@ -182,37 +241,44 @@ $corte_abierto = true; // Cambiar a false para probar el otro estado
         <div class="card-header">
             <h3 class="card-titulo">
                 <i class="fas fa-crown" style="color: #f59e0b;"></i>
-                Productos Más Vendidos
+                Productos Más Vendidos (30 días)
             </h3>
             <a href="productos_mas_vendidos.php" class="card-link">
                 Ver todos <i class="fas fa-arrow-right"></i>
             </a>
         </div>
         <div class="card-content">
-            <?php if (count($productos_top) > 0): ?>
+            <?php if ($productos_top->num_rows > 0): ?>
                 <div class="productos-lista">
-                    <?php foreach ($productos_top as $prod): ?>
+                    <?php while($prod = $productos_top->fetch_assoc()): ?>
                     <div class="producto-item">
                         <div class="producto-imagen">
-                            <img src="<?php echo $prod['imagen'] ?: '/nuevo/assets/images/no-image.png'; ?>" 
-                                 alt="<?php echo htmlspecialchars($prod['nombre']); ?>">
+                            <?php if (!empty($prod['imagen_url'])): ?>
+                                <!-- CORREGIDO: Usamos BASE_URL directamente para evitar el doble 'assets' -->
+                                <img src="<?php echo BASE_URL . '/' . $prod['imagen_url']; ?>" 
+                                     alt="<?php echo h($prod['nombre']); ?>"
+                                     onerror="this.onerror=null; this.src='<?php echo BASE_URL . '/assets/images/no-image.png'; ?>'">
+                            <?php else: ?>
+                                <img src="<?php echo BASE_URL . '/assets/images/no-image.png'; ?>" 
+                                     alt="Sin imagen">
+                            <?php endif; ?>
                         </div>
                         <div class="producto-info">
-                            <p class="producto-nombre"><?php echo htmlspecialchars($prod['nombre']); ?></p>
+                            <p class="producto-nombre"><?php echo h($prod['nombre']); ?></p>
                             <div class="producto-stats">
                                 <span><i class="fas fa-shopping-cart"></i> <?php echo $prod['total_vendido']; ?> vendidos</span>
                                 <span><i class="fas fa-dollar-sign"></i> $<?php echo number_format($prod['total_ingresos'], 2); ?></span>
                             </div>
                         </div>
                     </div>
-                    <?php endforeach; ?>
+                    <?php endwhile; ?>
                 </div>
             <?php else: ?>
                 <div class="empty-state">
                     <div class="empty-icon">
                         <i class="fas fa-shopping-cart"></i>
                     </div>
-                    <p>No hay ventas en este período</p>
+                    <p>No hay ventas en los últimos 30 días</p>
                 </div>
             <?php endif; ?>
         </div>
@@ -230,20 +296,20 @@ $corte_abierto = true; // Cambiar a false para probar el otro estado
             </a>
         </div>
         <div class="card-content">
-            <?php if (count($ultimos_cortes) > 0): ?>
+            <?php if ($ultimos_cortes->num_rows > 0): ?>
                 <div class="cortes-lista">
-                    <?php foreach ($ultimos_cortes as $corte): ?>
+                    <?php while($corte = $ultimos_cortes->fetch_assoc()): ?>
                     <div class="corte-item">
                         <div class="corte-info">
                             <p class="corte-fecha"><?php echo date('d/m/Y H:i', strtotime($corte['fecha_cierre'])); ?></p>
-                            <p class="corte-usuario"><?php echo $corte['username']; ?></p>
+                            <p class="corte-usuario"><?php echo h($corte['username']); ?></p>
                         </div>
                         <div class="corte-montos">
-                            <p class="corte-total">$<?php echo number_format($corte['monto_final'], 2); ?></p>
-                            <p class="corte-ventas"><?php echo $corte['ventas_totales']; ?> ventas</p>
+                            <p class="corte-total">$<?php echo number_format($corte['monto_final'] ?? 0, 2); ?></p>
+                            <p class="corte-ventas"><?php echo $corte['ventas_totales'] ?? 0; ?> ventas</p>
                         </div>
                     </div>
-                    <?php endforeach; ?>
+                    <?php endwhile; ?>
                 </div>
             <?php else: ?>
                 <div class="empty-state">
@@ -335,9 +401,7 @@ document.addEventListener('DOMContentLoaded', function() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    display: false
-                },
+                legend: { display: false },
                 tooltip: {
                     backgroundColor: '#1f2937',
                     titleColor: '#f3f4f6',
@@ -352,21 +416,10 @@ document.addEventListener('DOMContentLoaded', function() {
             scales: {
                 y: {
                     beginAtZero: true,
-                    grid: {
-                        color: '#e5e7eb',
-                        drawBorder: false
-                    },
-                    ticks: {
-                        callback: function(value) {
-                            return '$' + value;
-                        }
-                    }
+                    grid: { color: '#e5e7eb', drawBorder: false },
+                    ticks: { callback: function(value) { return '$' + value; } }
                 },
-                x: {
-                    grid: {
-                        display: false
-                    }
-                }
+                x: { grid: { display: false } }
             }
         }
     });

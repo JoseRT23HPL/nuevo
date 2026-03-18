@@ -1,20 +1,115 @@
 <?php
-// Este archivo es solo HTML
+// dashboard/index.php - VERSIÓN CONECTADA A BD
+require_once '../config.php';
+requiereAuth();
+
+$conn = getDB();
+
+// ===== 1. TOTAL DE PRODUCTOS =====
+$result = $conn->query("SELECT COUNT(*) as total FROM productos WHERE activo = 1");
+$total_productos = $result->fetch_assoc()['total'];
+
+// ===== 2. PRODUCTOS CON STOCK BAJO (stock_actual < stock_minimo) =====
+$result = $conn->query("
+    SELECT COUNT(*) as total 
+    FROM productos 
+    WHERE activo = 1 AND stock_actual < stock_minimo
+");
+$stock_bajo_count = $result->fetch_assoc()['total'];
+
+// ===== 3. VENTAS DE HOY =====
+$hoy = date('Y-m-d');
+$stmt = $conn->prepare("
+    SELECT 
+        COUNT(*) as total_ventas,
+        COALESCE(SUM(total), 0) as total_ingresos
+    FROM ventas 
+    WHERE DATE(fecha_venta) = ? AND estado = 'completada'
+");
+$stmt->bind_param("s", $hoy);
+$stmt->execute();
+$ventas_hoy = $stmt->get_result()->fetch_assoc();
+
+// ===== 4. USUARIOS ACTIVOS =====
+$result = $conn->query("SELECT COUNT(*) as total FROM usuarios WHERE activo = 1");
+$usuarios_activos = $result->fetch_assoc()['total'];
+
+// ===== 5. ÚLTIMAS 5 VENTAS =====
+$ultimas_ventas = $conn->query("
+    SELECT 
+        v.id,
+        v.folio,
+        v.fecha_venta,
+        v.total,
+        u.username,
+        v.estado
+    FROM ventas v
+    JOIN usuarios u ON v.id_usuario = u.id
+    WHERE v.estado = 'completada'
+    ORDER BY v.fecha_venta DESC 
+    LIMIT 5
+");
+
+// ===== 6. PRODUCTOS CON STOCK BAJO (detalles) =====
+$productos_bajo_stock = $conn->query("
+    SELECT 
+        id,
+        nombre,
+        sku,
+        stock_actual,
+        stock_minimo
+    FROM productos 
+    WHERE activo = 1 AND stock_actual < stock_minimo
+    ORDER BY (stock_actual / stock_minimo) ASC
+    LIMIT 5
+");
+
+// ===== 7. VENTAS POR DÍA PARA EL GRÁFICO (últimos 7 días) =====
+$fechas = [];
+$ventas_diarias = [];
+$dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+for ($i = 6; $i >= 0; $i--) {
+    $fecha = date('Y-m-d', strtotime("-$i days"));
+    $dia_semana = $dias[date('w', strtotime($fecha))];
+    $fechas[] = $dia_semana . ' ' . date('d/m', strtotime($fecha));
+    
+    $stmt = $conn->prepare("
+        SELECT COALESCE(SUM(total), 0) as total 
+        FROM ventas 
+        WHERE DATE(fecha_venta) = ? AND estado = 'completada'
+    ");
+    $stmt->bind_param("s", $fecha);
+    $stmt->execute();
+    $ventas_diarias[] = $stmt->get_result()->fetch_assoc()['total'];
+}
+
 include 'header.php';
 ?>
 
 <!-- ===== SECCIÓN DE BIENVENIDA ===== -->
 <section class="welcome-section">
     <div class="welcome-container">
-        <!-- Saludo personalizado -->
+        <!-- Saludo personalizado con nombre real -->
         <div class="welcome-header">
             <span class="welcome-greeting">¡Hola de nuevo,</span>
-            <h1 class="welcome-name">Admin User! 👋</h1>
+            <h1 class="welcome-name">
+                <?php echo h($_SESSION['username'] ?? 'Usuario'); ?>! 👋
+            </h1>
         </div>
         
-        <!-- Mensaje motivacional -->
+        <!-- Mensaje motivacional dinámico -->
         <p class="welcome-message">
-            Vamos a ver qué tenemos hoy en tu negocio
+            <?php
+            $hora = date('H');
+            if ($hora < 12) {
+                echo "¡Buenos días! Comienza tu jornada con energía.";
+            } elseif ($hora < 18) {
+                echo "¡Buena tarde! Sigue avanzando con tus ventas.";
+            } else {
+                echo "¡Buena noche! Revisa el cierre del día.";
+            }
+            ?>
         </p>
         
         <!-- Indicador de scroll con animación -->
@@ -41,7 +136,7 @@ include 'header.php';
     <!-- Dashboard Header -->
     <div class="dashboard-header">
         <h1 class="dashboard-title">Dashboard</h1>
-        <p class="dashboard-subtitle">Aquí tienes el resumen de tu negocio hoy</p>
+        <p class="dashboard-subtitle">Aquí tienes el resumen de tu negocio hoy - <?php echo date('d/m/Y'); ?></p>
     </div>
 
     <!-- Tarjetas de estadísticas -->
@@ -54,11 +149,15 @@ include 'header.php';
                 </div>
                 <span class="stat-badge">Inventario</span>
             </div>
-            <h3 class="stat-value">1,234</h3>
+            <h3 class="stat-value"><?php echo number_format($total_productos); ?></h3>
             <p class="stat-label">Total Productos</p>
+            <?php
+            // Calcular porcentaje de crecimiento (esto requeriría datos históricos)
+            // Por ahora mostramos un mensaje simple
+            ?>
             <div class="stat-footer">
-                <span class="stat-trend">+5%</span>
-                <span>vs mes anterior</span>
+                <span class="stat-trend">✓</span>
+                <span>Activos en inventario</span>
             </div>
         </div>
         
@@ -70,11 +169,15 @@ include 'header.php';
                 </div>
                 <span class="stat-badge">Alerta</span>
             </div>
-            <h3 class="stat-value">12</h3>
+            <h3 class="stat-value"><?php echo $stock_bajo_count; ?></h3>
             <p class="stat-label">Stock Bajo</p>
-            <a href="/dashboard/inventario/stock_bajo.php" class="stat-link">
+            <?php if ($stock_bajo_count > 0): ?>
+            <a href="<?php echo url('dashboard/inventario/stock_bajo.php'); ?>" class="stat-link">
                 Revisar stock <i class="fas fa-arrow-right"></i>
             </a>
+            <?php else: ?>
+            <span class="stat-link" style="color: var(--success);">Todo bien ✓</span>
+            <?php endif; ?>
         </div>
         
         <!-- Ventas Hoy -->
@@ -85,7 +188,7 @@ include 'header.php';
                 </div>
                 <span class="stat-badge">Hoy</span>
             </div>
-            <h3 class="stat-value">24</h3>
+            <h3 class="stat-value"><?php echo $ventas_hoy['total_ventas'] ?? 0; ?></h3>
             <p class="stat-label">Ventas del día</p>
         </div>
         
@@ -97,7 +200,7 @@ include 'header.php';
                 </div>
                 <span class="stat-badge">Hoy</span>
             </div>
-            <h3 class="stat-value">$1,250.00</h3>
+            <h3 class="stat-value">$<?php echo number_format($ventas_hoy['total_ingresos'] ?? 0, 2); ?></h3>
             <p class="stat-label">Ingresos del día</p>
         </div>
         
@@ -109,7 +212,7 @@ include 'header.php';
                 </div>
                 <span class="stat-badge">Sistema</span>
             </div>
-            <h3 class="stat-value">8</h3>
+            <h3 class="stat-value"><?php echo $usuarios_activos; ?></h3>
             <p class="stat-label">Usuarios Activos</p>
         </div>
     </div>
@@ -123,7 +226,7 @@ include 'header.php';
                     <i class="fas fa-history"></i>
                     Últimas Ventas
                 </h3>
-                <a href="/dashboard/ventas/historial.php" class="card-link">
+                <a href="<?php echo url('dashboard/ventas/historial.php'); ?>" class="card-link">
                     Ver todas <i class="fas fa-arrow-right"></i>
                 </a>
             </div>
@@ -139,36 +242,20 @@ include 'header.php';
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td class="folio">#V001234</td>
-                                <td>15/03/2024 14:30</td>
-                                <td>Admin</td>
-                                <td class="amount">$1,250.00</td>
-                            </tr>
-                            <tr>
-                                <td class="folio">#V001233</td>
-                                <td>15/03/2024 12:15</td>
-                                <td>María G.</td>
-                                <td class="amount">$890.50</td>
-                            </tr>
-                            <tr>
-                                <td class="folio">#V001232</td>
-                                <td>15/03/2024 10:45</td>
-                                <td>Carlos R.</td>
-                                <td class="amount">$2,340.00</td>
-                            </tr>
-                            <tr>
-                                <td class="folio">#V001231</td>
-                                <td>14/03/2024 18:20</td>
-                                <td>Admin</td>
-                                <td class="amount">$560.00</td>
-                            </tr>
-                            <tr>
-                                <td class="folio">#V001230</td>
-                                <td>14/03/2024 16:00</td>
-                                <td>Laura M.</td>
-                                <td class="amount">$1,890.00</td>
-                            </tr>
+                            <?php if ($ultimas_ventas->num_rows > 0): ?>
+                                <?php while($venta = $ultimas_ventas->fetch_assoc()): ?>
+                                <tr>
+                                    <td class="folio"><?php echo h($venta['folio']); ?></td>
+                                    <td><?php echo date('d/m/Y H:i', strtotime($venta['fecha_venta'])); ?></td>
+                                    <td><?php echo h($venta['username']); ?></td>
+                                    <td class="amount">$<?php echo number_format($venta['total'], 2); ?></td>
+                                </tr>
+                                <?php endwhile; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="4" class="text-center">No hay ventas recientes</td>
+                                </tr>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
@@ -182,83 +269,44 @@ include 'header.php';
                     <i class="fas fa-exclamation-circle warning-icon"></i>
                     Stock Bajo
                 </h3>
-                <a href="/dashboard/inventario/stock_bajo.php" class="card-link">
+                <a href="<?php echo url('dashboard/inventario/stock_bajo.php'); ?>" class="card-link">
                     Ver todos <i class="fas fa-arrow-right"></i>
                 </a>
             </div>
             <div class="card-body">
                 <div class="stock-list">
-                    <!-- Producto 1 -->
-                    <div class="stock-item">
-                        <div class="stock-info">
-                            <p class="stock-name">Martillo de Uña 16oz</p>
-                            <p class="stock-code">Código: MT-001</p>
-                        </div>
-                        <div class="stock-details">
-                            <div class="stock-numbers">
-                                <span class="stock-current zero">0</span>
-                                <span class="stock-min">/ 5</span>
+                    <?php if ($productos_bajo_stock->num_rows > 0): ?>
+                        <?php while($producto = $productos_bajo_stock->fetch_assoc()): 
+                            $porcentaje = ($producto['stock_actual'] / $producto['stock_minimo']) * 100;
+                            $estado = $producto['stock_actual'] == 0 ? 'danger' : 'warning';
+                            $texto_estado = $producto['stock_actual'] == 0 ? 'AGOTADO' : 'BAJO';
+                        ?>
+                        <div class="stock-item">
+                            <div class="stock-info">
+                                <p class="stock-name"><?php echo h($producto['nombre']); ?></p>
+                                <p class="stock-code">Código: <?php echo h($producto['sku']); ?></p>
                             </div>
-                            <span class="stock-badge danger">AGOTADO</span>
-                            <a href="#" class="stock-action">
-                                <i class="fas fa-cubes"></i>
-                            </a>
-                        </div>
-                    </div>
-                    
-                    <!-- Producto 2 -->
-                    <div class="stock-item">
-                        <div class="stock-info">
-                            <p class="stock-name">Taladro Percutor 500W</p>
-                            <p class="stock-code">Código: TL-023</p>
-                        </div>
-                        <div class="stock-details">
-                            <div class="stock-numbers">
-                                <span class="stock-current">2</span>
-                                <span class="stock-min">/ 3</span>
+                            <div class="stock-details">
+                                <div class="stock-numbers">
+                                    <span class="stock-current <?php echo $producto['stock_actual'] == 0 ? 'zero' : ''; ?>">
+                                        <?php echo $producto['stock_actual']; ?>
+                                    </span>
+                                    <span class="stock-min">/ <?php echo $producto['stock_minimo']; ?></span>
+                                </div>
+                                <span class="stock-badge <?php echo $estado; ?>"><?php echo $texto_estado; ?></span>
+                                <a href="<?php echo url('dashboard/inventario/entrada_rapida.php?producto=' . $producto['id']); ?>" 
+                                   class="stock-action" title="Agregar stock">
+                                    <i class="fas fa-cubes"></i>
+                                </a>
                             </div>
-                            <span class="stock-badge warning">BAJO</span>
-                            <a href="#" class="stock-action">
-                                <i class="fas fa-cubes"></i>
-                            </a>
                         </div>
-                    </div>
-                    
-                    <!-- Producto 3 -->
-                    <div class="stock-item">
-                        <div class="stock-info">
-                            <p class="stock-name">Caja de Tornillos 1/2"</p>
-                            <p class="stock-code">Código: TR-456</p>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <div class="empty-state">
+                            <i class="fas fa-check-circle" style="color: var(--success); font-size: 2rem;"></i>
+                            <p>No hay productos con stock bajo</p>
                         </div>
-                        <div class="stock-details">
-                            <div class="stock-numbers">
-                                <span class="stock-current">3</span>
-                                <span class="stock-min">/ 10</span>
-                            </div>
-                            <span class="stock-badge warning">BAJO</span>
-                            <a href="#" class="stock-action">
-                                <i class="fas fa-cubes"></i>
-                            </a>
-                        </div>
-                    </div>
-                    
-                    <!-- Producto 4 -->
-                    <div class="stock-item">
-                        <div class="stock-info">
-                            <p class="stock-name">Sierra Circular 7-1/4"</p>
-                            <p class="stock-code">Código: SR-789</p>
-                        </div>
-                        <div class="stock-details">
-                            <div class="stock-numbers">
-                                <span class="stock-current">1</span>
-                                <span class="stock-min">/ 2</span>
-                            </div>
-                            <span class="stock-badge warning">BAJO</span>
-                            <a href="#" class="stock-action">
-                                <i class="fas fa-cubes"></i>
-                            </a>
-                        </div>
-                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -279,7 +327,7 @@ include 'header.php';
 
     <!-- Acciones rápidas -->
     <div class="quick-actions">
-        <a href="/dashboard/productos/nuevo.php" class="action-card">
+        <a href="<?php echo url('dashboard/productos/nuevo.php'); ?>" class="action-card">
             <div class="action-icon blue">
                 <i class="fas fa-box"></i>
             </div>
@@ -289,7 +337,7 @@ include 'header.php';
             </div>
         </a>
         
-        <a href="/dashboard/ventas/index.php" class="action-card">
+        <a href="<?php echo url('dashboard/ventas/index.php'); ?>" class="action-card">
             <div class="action-icon green">
                 <i class="fas fa-cash-register"></i>
             </div>
@@ -299,7 +347,7 @@ include 'header.php';
             </div>
         </a>
         
-        <a href="/dashboard/clientes/nuevo.php" class="action-card">
+        <a href="<?php echo url('dashboard/clientes/nuevo.php'); ?>" class="action-card">
             <div class="action-icon purple">
                 <i class="fas fa-user-plus"></i>
             </div>
@@ -309,7 +357,7 @@ include 'header.php';
             </div>
         </a>
         
-        <a href="/dashboard/reportes/corte_caja.php" class="action-card">
+        <a href="<?php echo url('dashboard/reportes/corte_caja.php'); ?>" class="action-card">
             <div class="action-icon yellow">
                 <i class="fas fa-cash-register"></i>
             </div>
@@ -323,7 +371,7 @@ include 'header.php';
 
 <!-- ===== SCRIPTS ===== -->
 <!-- Primero main.js -->
-<script src="assets/js/main.js"></script>
+<script src="<?php echo BASE_URL; ?>/assets/js/main.js"></script>
 
 <!-- Script del gráfico -->
 <script>
@@ -352,10 +400,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Gráfico de ventas
+    // Gráfico de ventas con DATOS REALES
     const ctx = document.getElementById('ventasChart').getContext('2d');
-    const fechas = ['01/03', '02/03', '03/03', '04/03', '05/03', '06/03', '07/03'];
-    const ventas = [1250, 890, 2340, 560, 1890, 2100, 1750];
+    const fechas = <?php echo json_encode($fechas); ?>;
+    const ventas = <?php echo json_encode($ventas_diarias); ?>;
     
     new Chart(ctx, {
         type: 'line',
@@ -402,7 +450,5 @@ function mostrarModalGlobal() {
     alert('Funcionalidad de cierre de sesión');
 }
 </script>
-
-
 
 <?php include 'footer.php'; ?>
